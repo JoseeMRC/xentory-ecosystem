@@ -32,8 +32,10 @@ const MarketIcon = () => (
   </svg>
 );
 const BetIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-    <circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1.5" y="6" width="6" height="12" rx="2"/>
+    <rect x="9" y="6" width="6" height="12" rx="2"/>
+    <rect x="16.5" y="6" width="6" height="12" rx="2"/>
   </svg>
 );
 const BundleIcon = () => (
