@@ -22,10 +22,8 @@ const MarketIcon = () => (
   </svg>
 );
 const BetIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="1.5" y="6" width="6" height="12" rx="2"/>
-    <rect x="9" y="6" width="6" height="12" rx="2"/>
-    <rect x="16.5" y="6" width="6" height="12" rx="2"/>
+  <svg width="26" height="16" viewBox="0 0 26 16" fill="currentColor">
+    <text x="13" y="13" textAnchor="middle" fontSize="13" fontWeight="800" fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="1.5">1X2</text>
   </svg>
 );
 const ArrowIcon = () => (
