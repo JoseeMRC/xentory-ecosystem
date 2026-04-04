@@ -119,7 +119,17 @@ export function Navbar() {
   const [tickerOn, setTickerOn]    = useState(() => {
     try { return localStorage.getItem('xentory_ticker') !== 'off'; } catch { return true; }
   });
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerRef  = useRef<HTMLDivElement>(null);
+  const menuRef    = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!userMenu) return;
+    const fn = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setUserMenu(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [userMenu]);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -251,12 +261,9 @@ export function Navbar() {
           <QuickControls />
           {user ? (
             <>
-              <Link to="/dashboard" className="btn btn-ghost btn-sm">{t('nav.dashboard')}</Link>
+              <Link to="/dashboard" className="btn btn-ghost btn-sm" onClick={() => setUserMenu(false)}>{t('nav.dashboard')}</Link>
               {/* Avatar + dropdown */}
-              <div style={{ position: 'relative' }}
-                onMouseEnter={() => setUserMenu(true)}
-                onMouseLeave={() => setUserMenu(false)}
-              >
+              <div ref={menuRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setUserMenu(v => !v)}
                   style={{
