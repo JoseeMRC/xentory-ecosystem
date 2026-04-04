@@ -130,7 +130,11 @@ function LiveScoreboard({ match, liveData }: { match: Match; liveData: Partial<M
         <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
           <span style={{ fontSize:'1.1rem' }}>{sport.emoji}</span>
           <span style={{ fontSize:'0.82rem', color:sport.color, fontWeight:500 }}>{match.competition.name}</span>
-          {match.round && <span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>· {match.round}</span>}
+          {(isLive ? clock : (!isFinished && match.round)) && (
+            <span style={{ fontSize:'0.75rem', color: isLive ? 'var(--red)' : 'var(--muted)', fontWeight: isLive ? 600 : 400 }}>
+              · {isLive ? clock : match.round}
+            </span>
+          )}
         </div>
         <div style={{ display:'flex', gap:'0.6rem' }}>
           {isLive && (
