@@ -112,6 +112,187 @@ function BookmakerOddsRow({
   );
 }
 
+// ── Combined bet suggestion for Bet365 ────────────────────────────────────
+interface ComboSelection { label: string; market: string; odds: number }
+
+function buildComboSelections(
+  analysis: MatchAnalysis,
+  bkOdds:   MatchBookmakerOdds | null,
+  match:    Match,
+): ComboSelection[] {
+  const sels: ComboSelection[] = [];
+  const sport = match.sport;
+
+  // 1. Result (1X2 / Winner)
+  const rec     = analysis.markets.result.recommendation as 'home' | 'draw' | 'away';
+  const recProb = analysis.markets.result[rec];
+  if (recProb >= 55) {
+    const odds = rec === 'home'
+      ? (bkOdds?.result.home.perBookmaker.bet365 ?? analysis.markets.result.homeOdds)
+      : rec === 'away'
+        ? (bkOdds?.result.away.perBookmaker.bet365 ?? analysis.markets.result.awayOdds)
+        : (bkOdds?.result.draw.perBookmaker.bet365 ?? analysis.markets.result.drawOdds);
+    const label = rec === 'home'
+      ? `${match.homeTeam.name} gana`
+      : rec === 'away'
+        ? `${match.awayTeam.name} gana`
+        : 'Empate';
+    if (odds && odds > 1.01) sels.push({ label, market: sport === 'football' ? '1X2' : 'Ganador', odds });
+  }
+
+  // 2. Over/Under
+  const ouRec  = analysis.markets.overUnder25.recommendation as 'over' | 'under';
+  const ouProb = analysis.markets.overUnder25[ouRec];
+  if (ouProb >= 55) {
+    const odds = ouRec === 'over'
+      ? (bkOdds?.over25.perBookmaker.bet365  ?? parseFloat((1 / (ouProb / 100) * 0.94).toFixed(2)))
+      : (bkOdds?.under25.perBookmaker.bet365 ?? parseFloat((1 / (ouProb / 100) * 0.94).toFixed(2)));
+    const label = sport === 'basketball'
+      ? (ouRec === 'over' ? 'Over 210.5 puntos' : 'Under 210.5 puntos')
+      : sport === 'tennis'
+        ? (ouRec === 'over' ? 'Más de 2.5 sets' : 'Menos de 2.5 sets')
+        : (ouRec === 'over' ? 'Over 2.5 goles' : 'Under 2.5 goles');
+    if (odds && odds > 1.01) sels.push({ label, market: 'O/U', odds });
+  }
+
+  // 3. BTTS — football only
+  if (sport === 'football') {
+    const bttsRec  = analysis.markets.btts.recommendation as 'yes' | 'no';
+    const bttsProb = analysis.markets.btts[bttsRec];
+    if (bttsProb >= 60) {
+      const odds = bttsRec === 'yes'
+        ? bkOdds?.bttsYes.perBookmaker.bet365
+        : bkOdds?.bttsNo.perBookmaker.bet365;
+      const label = bttsRec === 'yes' ? 'Ambos marcan — Sí' : 'Ambos marcan — No';
+      if (odds && odds > 1.01) sels.push({ label, market: 'BTTS', odds });
+    }
+  }
+
+  return sels.slice(0, 3); // max 3 selections
+}
+
+function ComboBetCard({
+  analysis, bkOdds, match,
+}: {
+  analysis: MatchAnalysis;
+  bkOdds:   MatchBookmakerOdds | null;
+  match:    Match;
+}) {
+  const { t } = useLang();
+  const bet365 = BOOKMAKERS.find(b => b.id === 'bet365')!;
+  const sels   = buildComboSelections(analysis, bkOdds, match);
+
+  if (sels.length < 2) return null;
+
+  const combinedOdds = parseFloat(sels.reduce((acc, s) => acc * s.odds, 1).toFixed(2));
+  const stake        = 10;
+  const potential    = parseFloat((stake * combinedOdds).toFixed(2));
+  const isReal       = bkOdds?.result.home.isRealtime ?? false;
+
+  return (
+    <div className="glass" style={{
+      borderRadius: 16, padding: '1.5rem',
+      background: 'linear-gradient(135deg, rgba(0,165,81,0.06), rgba(0,165,81,0.02))',
+      border: '1px solid rgba(0,165,81,0.3)',
+      borderLeft: '3px solid #00a651',
+    }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.2rem', flexWrap:'wrap', gap:'0.6rem' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'0.6rem' }}>
+          <img src={bet365.logo} alt="Bet365" width={20} height={20} style={{ borderRadius:4 }} />
+          <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:'0.95rem' }}>
+            {t('Combinada sugerida — Bet365','Suggested Combo — Bet365')}
+          </span>
+          <span style={{ fontSize:'0.65rem', padding:'0.15rem 0.45rem', borderRadius:4,
+            background: isReal ? 'rgba(0,200,122,0.12)' : 'rgba(201,168,76,0.12)',
+            color: isReal ? 'var(--green)' : 'var(--gold)',
+            border: isReal ? '1px solid rgba(0,200,122,0.25)' : '1px solid rgba(201,168,76,0.25)',
+            fontWeight:600 }}>
+            {isReal ? t('Cuotas reales','Real odds') : t('Cuotas est.','Est. odds')}
+          </span>
+        </div>
+        <div style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
+          {sels.length} {t('selecciones','selections')}
+        </div>
+      </div>
+
+      {/* Selections */}
+      <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem', marginBottom:'1.2rem' }}>
+        {sels.map((sel, i) => (
+          <div key={i} style={{
+            display:'flex', alignItems:'center', justifyContent:'space-between',
+            padding:'0.6rem 0.8rem', borderRadius:9,
+            background:'rgba(0,165,81,0.05)', border:'1px solid rgba(0,165,81,0.15)',
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'0.6rem' }}>
+              <span style={{ width:20, height:20, borderRadius:'50%', background:'#00a651',
+                color:'#fff', fontSize:'0.65rem', fontWeight:800,
+                display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                {i + 1}
+              </span>
+              <div>
+                <div style={{ fontSize:'0.85rem', fontWeight:500, color:'var(--text)' }}>{sel.label}</div>
+                <div style={{ fontSize:'0.68rem', color:'var(--muted)' }}>{sel.market}</div>
+              </div>
+            </div>
+            <div style={{ fontFamily:'Outfit', fontWeight:700, fontSize:'0.95rem', color:'#00a651' }}>
+              @{sel.odds.toFixed(2)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Combined odds + potential */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'0.9rem 1rem', borderRadius:10,
+        background:'rgba(0,165,81,0.08)', border:'1px solid rgba(0,165,81,0.2)',
+        marginBottom:'1.1rem', flexWrap:'wrap', gap:'0.6rem',
+      }}>
+        <div>
+          <div style={{ fontSize:'0.68rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'0.2rem' }}>
+            {t('Cuota combinada','Combined odds')}
+          </div>
+          <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:'1.8rem', color:'#00a651', lineHeight:1 }}>
+            @{combinedOdds}
+          </div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontSize:'0.68rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'0.2rem' }}>
+            {t('Apuesta','Stake')} €{stake} → {t('potencial','potential')}
+          </div>
+          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:'1.4rem', color:'var(--text)', lineHeight:1 }}>
+            €{potential}
+          </div>
+        </div>
+      </div>
+
+      {/* CTA */}
+      <a
+        href={bet365.loginUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem',
+          width:'100%', padding:'0.85rem 1rem', borderRadius:10,
+          background:'#00a651', color:'#fff',
+          fontFamily:'Outfit', fontWeight:700, fontSize:'0.9rem',
+          textDecoration:'none', transition:'opacity 0.18s',
+          boxSizing:'border-box',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+      >
+        <img src={bet365.logo} alt="" width={16} height={16} style={{ borderRadius:3, filter:'brightness(0) invert(1)' }} />
+        {t('Apostar combinada en Bet365','Place combo at Bet365')} →
+      </a>
+      <div style={{ fontSize:'0.68rem', color:'var(--muted)', textAlign:'center', marginTop:'0.6rem', lineHeight:1.5 }}>
+        {t('Añade las selecciones manualmente al boleto de Bet365 · Juega con responsabilidad','Add selections manually to your Bet365 betslip · Gamble responsibly')}
+      </div>
+    </div>
+  );
+}
+
 function LiveScoreboard({ match, liveData }: { match: Match; liveData: Partial<Match>|null }) {
   const { t, lang } = useLang();
   const sport      = SPORT_CONFIG[match.sport as keyof typeof SPORT_CONFIG];
@@ -488,6 +669,8 @@ export function MatchAnalysisPage() {
               ) : <div style={{ padding:'2rem', textAlign:'center', color:'var(--muted)', fontSize:'0.85rem' }}>🔒 {t('Mercado de hándicap disponible en Plan Pro','Handicap market available on Pro Plan')}</div>}
             </div>
           </div>
+
+          <ComboBetCard analysis={analysis} bkOdds={bkOdds} match={match} />
 
           <div className="glass" style={{ borderRadius:16, padding:'1.5rem' }}>
             <h3 style={{ fontSize:'0.9rem', marginBottom:'1.2rem' }}>📋 {t('Forma reciente','Recent form')}</h3>
