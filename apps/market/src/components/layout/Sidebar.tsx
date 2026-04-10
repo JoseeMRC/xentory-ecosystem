@@ -51,6 +51,14 @@ const IconSignOut = () => (
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
   </svg>
 );
+const IconPortfolio = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="20" height="14" rx="2"/>
+    <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+    <line x1="12" y1="12" x2="12" y2="16"/>
+    <line x1="10" y1="14" x2="14" y2="14"/>
+  </svg>
+);
 
 const HUB_URL = (import.meta as any).env?.VITE_HUB_URL ?? 'https://x-eight-beryl.vercel.app';
 const PLAN_COLORS: Record<string, string> = { free: '#6b7294', pro: '#c9a84c', elite: '#00d4ff' };
@@ -106,6 +114,29 @@ function NavContent({ onNav }: { onNav?: () => void }) {
             {item.label}
           </NavLink>
         ))}
+        {/* Divider */}
+        <div style={{ margin: '0.3rem 0 0.1rem', padding: '0 0.8rem' }}>
+          <div style={{ height: 1, background: 'var(--border)' }} />
+        </div>
+        {/* Mi Cartera — external link to Hub */}
+        <a
+          href={`${HUB_URL}/portfolio`}
+          onClick={() => onNav?.()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.7rem',
+            padding: '0.52rem 0.8rem', borderRadius: 7, textDecoration: 'none',
+            fontSize: '0.85rem', fontWeight: 300,
+            color: 'var(--muted)',
+            background: 'transparent',
+            borderLeft: '2px solid transparent',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--card2)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'transparent'; }}
+        >
+          <span style={{ opacity: 0.75, flexShrink: 0, display: 'flex' }}><IconPortfolio /></span>
+          <span style={{ flex: 1 }}>{t('Mi Cartera', 'My Portfolio')}</span>
+        </a>
       </nav>
 
       {user && (
