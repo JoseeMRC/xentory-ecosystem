@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
+import { ScrollToTopBtn } from './components/layout/ScrollToTopBtn';
 import './styles/global.css';
 
 const HomePage        = lazy(() => import('./components/home/HomePage'));
@@ -40,6 +41,7 @@ function Layout({ children, hideFooter }: { children: React.ReactNode; hideFoote
       <Navbar />
       <main><Suspense fallback={<PageSkeleton />}>{children}</Suspense></main>
       {!hideFooter && <Footer />}
+      <ScrollToTopBtn />
     </>
   );
 }

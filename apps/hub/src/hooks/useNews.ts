@@ -32,11 +32,53 @@ const ES_FEEDS: Record<string, string> = {
   forex:    'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/seccion/economia/portada',
   sports:   'https://www.marca.com/rss/portada.xml',
   platform: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/seccion/tecnologia/portada',
-  all:      'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada',
 };
 
+// For 'all' ES, merge economia + tecnología + deportes feeds (3 sources × 6 articles = 18 max)
+const ES_ALL_FEEDS: Array<{ url: string; category: string }> = [
+  { url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/seccion/economia/portada', category: 'stocks'   },
+  { url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/seccion/tecnologia/portada', category: 'platform' },
+  { url: 'https://www.marca.com/rss/portada.xml', category: 'sports' },
+];
+
+async function fetchESAll(signal: AbortSignal): Promise<NewsArticle[]> {
+  const results = await Promise.allSettled(
+    ES_ALL_FEEDS.map(async ({ url, category }) => {
+      const params = new URLSearchParams({ rss_url: url, count: '6' });
+      const res = await fetch(`${RSS2J}?${params}`, { signal });
+      if (!res.ok) throw new Error(`rss2json ${res.status}`);
+      const data = await res.json();
+      if (data.status !== 'ok') throw new Error('rss2json error');
+      const feedName = data.feed?.title ?? '';
+      return (data.items ?? [])
+        .filter((i: any) => i.title && i.link)
+        .map((i: any): NewsArticle => ({
+          id:          i.guid ?? i.link,
+          title:       stripHtml(i.title),
+          description: i.description ? stripHtml(i.description).slice(0, 200) || null : null,
+          url:         i.link,
+          source:      feedName || i.author || 'Noticias',
+          publishedAt: i.pubDate ?? new Date().toISOString(),
+          imageUrl:    i.enclosure?.link ?? i.thumbnail ?? null,
+          category,
+          language:    'es',
+        }));
+    }),
+  );
+  const merged: NewsArticle[] = [];
+  const seen = new Set<string>();
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      for (const a of r.value) {
+        if (!seen.has(a.id)) { seen.add(a.id); merged.push(a); }
+      }
+    }
+  }
+  return merged.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+}
+
 async function fetchES(category: string, signal: AbortSignal): Promise<NewsArticle[]> {
-  const url    = ES_FEEDS[category] ?? ES_FEEDS.all;
+  const url    = ES_FEEDS[category] ?? ES_FEEDS.stocks;
   const params = new URLSearchParams({ rss_url: url, count: '12' });
   const res    = await fetch(`${RSS2J}?${params}`, { signal });
   if (!res.ok) throw new Error(`rss2json ${res.status}`);
@@ -87,6 +129,39 @@ function mapGuardian(a: any, category: string): NewsArticle {
     category,
     language:    'en',
   };
+}
+
+// For 'all' EN — fetch business + technology + sport sections and merge
+async function fetchGuardianAll(signal: AbortSignal): Promise<NewsArticle[]> {
+  const sections: Array<{ section: string; category: string }> = [
+    { section: 'business',   category: 'stocks'   },
+    { section: 'technology', category: 'platform' },
+    { section: 'sport',      category: 'sports'   },
+  ];
+  const results = await Promise.allSettled(
+    sections.map(async ({ section, category }) => {
+      const params = new URLSearchParams({
+        'api-key': GU_KEY, section,
+        'show-fields': 'thumbnail,trailText',
+        'page-size': '6', 'order-by': 'newest',
+      });
+      const res  = await fetch(`${GU}?${params}`, { signal });
+      if (!res.ok) throw new Error(`Guardian ${res.status}`);
+      const data = await res.json();
+      if (data.response?.status !== 'ok') throw new Error('Guardian error');
+      return (data.response?.results ?? []).map((a: any) => mapGuardian(a, category));
+    }),
+  );
+  const merged: NewsArticle[] = [];
+  const seen = new Set<string>();
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      for (const a of r.value) {
+        if (!seen.has(a.id)) { seen.add(a.id); merged.push(a); }
+      }
+    }
+  }
+  return merged.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 }
 
 async function fetchGuardian(category: string, signal: AbortSignal): Promise<NewsArticle[]> {
@@ -169,6 +244,21 @@ function filterFresh(articles: NewsArticle[]): NewsArticle[] {
 async function fetchForCategory(
   category: string, lang: 'es'|'en', signal: AbortSignal,
 ): Promise<NewsArticle[]> {
+  // 'all' — especial: mezcla economía + tecnología + deportes de múltiples fuentes
+  if (category === 'all') {
+    if (lang === 'es') {
+      try {
+        const items = filterFresh(await fetchESAll(signal));
+        if (items.length > 0) return items;
+      } catch { /**/ }
+    }
+    try {
+      const items = filterFresh(await fetchGuardianAll(signal));
+      if (items.length > 0) return items;
+    } catch { /**/ }
+    return [];
+  }
+
   // Español: intentar RSS feeds españoles primero
   if (lang === 'es') {
     try {
@@ -189,7 +279,7 @@ async function fetchForCategory(
     if (gu.length > 0) return gu;
   } catch { /**/ }
   try {
-    const hn = await fetchHN(GU_QUERY[category] ?? 'world news', signal);
+    const hn = await fetchHN(GU_QUERY[category] ?? 'finance investment trading', signal);
     if (hn.length > 0) return hn;
   } catch { /**/ }
 

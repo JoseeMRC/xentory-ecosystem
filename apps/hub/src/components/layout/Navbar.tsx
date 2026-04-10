@@ -85,6 +85,12 @@ const PortfolioIcon = () => (
     <line x1="10" y1="14" x2="14" y2="14"/>
   </svg>
 );
+const BlogIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+  </svg>
+);
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <polyline points="20 6 9 17 4 12"/>
@@ -297,9 +303,8 @@ export function Navbar() {
                     </div>
                     {/* Nav actions */}
                     {[
-                      { label: t('nav.dashboard'), icon: <DashIcon />,    to: '/dashboard' },
-                      { label: t('nav.portfolio'), icon: <PortfolioIcon />, to: '/portfolio' },
-                      { label: t('nav.myplans'),   icon: <PlanIcon />,      to: '/pricing'   },
+                      { label: t('nav.blog'),    icon: <BlogIcon />,  to: '/blog'    },
+                      { label: t('nav.myplans'), icon: <PlanIcon />,  to: '/pricing' },
                     ].map(item => (
                       <div key={item.to} onClick={() => { navigate(item.to); setUserMenu(false); }}
                         style={{ padding: '0.65rem 1rem', cursor: 'pointer', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text2)', transition: 'background 0.12s' }}
@@ -415,14 +420,14 @@ export function Navbar() {
                   }}>
                     <DashIcon /> {t('nav.dashboard')}
                   </Link>
-                  {/* Portfolio link */}
-                  <Link to="/portfolio" onClick={() => setMob(false)} style={{
+                  {/* Blog / Noticias link */}
+                  <Link to="/blog" onClick={() => setMob(false)} style={{
                     textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
                     padding: '0.8rem 1rem', borderRadius: 12, minHeight: 48,
                     background: 'var(--card2)', border: '1px solid var(--border)',
                     color: 'var(--text2)', fontSize: '0.9rem', fontWeight: 600,
                   }}>
-                    <PortfolioIcon /> {t('nav.portfolio')}
+                    <BlogIcon /> {t('nav.blog')}
                   </Link>
                   {/* Account buttons */}
                   <div className="hub-mob-acct-btns">
