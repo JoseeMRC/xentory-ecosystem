@@ -293,6 +293,35 @@ function ComboBetCard({
   );
 }
 
+// ── Resolve real odds for bestBet by mapping AI market text to bkOdds ─────
+function resolveBestBetOdds(
+  bestBet: MatchAnalysis['markets']['bestBet'],
+  markets: MatchAnalysis['markets'],
+  bkOdds:  MatchBookmakerOdds,
+): { odds: number; isRealtime: boolean } {
+  const txt = (bestBet.market + ' ' + bestBet.pick).toLowerCase();
+
+  if (/over|under|gol|goal|2\.5|3\.5|punt|point|set/i.test(txt)) {
+    const rec = markets.overUnder25.recommendation;
+    const mkt = rec === 'over' ? bkOdds.over25 : bkOdds.under25;
+    return { odds: mkt.best, isRealtime: mkt.isRealtime };
+  }
+  if (/btts|ambos|both|marcan|score/i.test(txt)) {
+    const rec = markets.btts.recommendation;
+    const mkt = rec === 'yes' ? bkOdds.bttsYes : bkOdds.bttsNo;
+    return { odds: mkt.best, isRealtime: mkt.isRealtime };
+  }
+  if (/handicap|h[aá]ndicap/i.test(txt)) {
+    return { odds: bkOdds.handicap.best, isRealtime: bkOdds.handicap.isRealtime };
+  }
+  // default: result (1X2)
+  const rec = markets.result.recommendation;
+  const mkt = rec === 'home' ? bkOdds.result.home
+            : rec === 'away' ? bkOdds.result.away
+            : bkOdds.result.draw;
+  return { odds: mkt.best, isRealtime: mkt.isRealtime };
+}
+
 function LiveScoreboard({ match, liveData }: { match: Match; liveData: Partial<Match>|null }) {
   const { t, lang } = useLang();
   const sport      = SPORT_CONFIG[match.sport as keyof typeof SPORT_CONFIG];
@@ -528,19 +557,21 @@ export function MatchAnalysisPage() {
                 <div style={{ fontSize:'0.82rem', color:'var(--muted)' }}>{analysis.markets.bestBet.market}</div>
               </div>
               <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
-                <div style={{ textAlign:'center' }}>
-                  {/* Mejor cuota real de las casas */}
-                  <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:'1.8rem', color:'var(--gold)' }}>
-                    @{bkOdds ? Math.max(
-                        bkOdds.result.home.best,
-                        bkOdds.result.draw.best,
-                        bkOdds.result.away.best,
-                      ).toFixed(2) : analysis.markets.bestBet.odds}
-                  </div>
-                  <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>
-                    {bkOdds?.result.home.isRealtime ? t('Mejor cuota real','Best real odds') : t('Mejor cuota est.','Best est. odds')}
-                  </div>
-                </div>
+                {(() => {
+                  const resolved = bkOdds
+                    ? resolveBestBetOdds(analysis.markets.bestBet, analysis.markets, bkOdds)
+                    : { odds: analysis.markets.bestBet.odds, isRealtime: false };
+                  return (
+                    <div style={{ textAlign:'center' }}>
+                      <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:'1.8rem', color:'var(--gold)' }}>
+                        @{resolved.odds.toFixed(2)}
+                      </div>
+                      <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>
+                        {resolved.isRealtime ? t('Mejor cuota real','Best real odds') : t('Mejor cuota est.','Best est. odds')}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div style={{ textAlign:'center' }}>
                   <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:'1.8rem', color:confidenceColor(analysis.markets.bestBet.confidence) }}>{analysis.markets.bestBet.confidence}%</div>
                   <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{t('Confianza','Confidence')}</div>
@@ -570,8 +601,8 @@ export function MatchAnalysisPage() {
               {match.sport === 'football' ? (
                 <>
                   <h3 style={{ fontSize:'0.9rem', marginBottom:'1rem' }}>📊 {t('Goles Over/Under','Goals Over/Under')}</h3>
-                  <MarketRow label={t('Over 2.5 goles','Over 2.5 goals')} prob={analysis.markets.overUnder25.over} recommendation="over" isRec={analysis.markets.overUnder25.recommendation==='over'} odds={bkOdds?.over25.best ?? parseFloat((1/(analysis.markets.overUnder25.over/100)*0.92).toFixed(2))} />
-                  <MarketRow label={t('Under 2.5 goles','Under 2.5 goals')} prob={analysis.markets.overUnder25.under} recommendation="under" isRec={analysis.markets.overUnder25.recommendation==='under'} odds={bkOdds?.under25.best} />
+                  <MarketRow label={t('Over 2.5 goles','Over 2.5 goals')} prob={analysis.markets.overUnder25.over} recommendation="over" isRec={analysis.markets.overUnder25.recommendation==='over'} odds={bkOdds?.over25.best ?? parseFloat((1/(analysis.markets.overUnder25.over/100)*0.93).toFixed(2))} />
+                  <MarketRow label={t('Under 2.5 goles','Under 2.5 goals')} prob={analysis.markets.overUnder25.under} recommendation="under" isRec={analysis.markets.overUnder25.recommendation==='under'} odds={bkOdds?.under25.best ?? parseFloat((1/(analysis.markets.overUnder25.under/100)*0.93).toFixed(2))} />
                   {bkOdds && (
                     <BookmakerOddsRow
                       marketOdds={analysis.markets.overUnder25.recommendation === 'over' ? bkOdds.over25 : bkOdds.under25}
@@ -608,8 +639,8 @@ export function MatchAnalysisPage() {
             {match.sport === 'football' ? (
               <div className="glass" style={{ borderRadius:16, padding:'1.5rem' }}>
                 <h3 style={{ fontSize:'0.9rem', marginBottom:'1rem' }}>🥅 BTTS — {t('Ambos marcan','Both teams score')}</h3>
-                <MarketRow label={t('BTTS — Sí','BTTS — Yes')} prob={analysis.markets.btts.yes} recommendation="yes" isRec={analysis.markets.btts.recommendation==='yes'} odds={bkOdds?.bttsYes.best} />
-                <MarketRow label={t('BTTS — No','BTTS — No')} prob={analysis.markets.btts.no} recommendation="no" isRec={analysis.markets.btts.recommendation==='no'} odds={bkOdds?.bttsNo.best} />
+                <MarketRow label={t('BTTS — Sí','BTTS — Yes')} prob={analysis.markets.btts.yes} recommendation="yes" isRec={analysis.markets.btts.recommendation==='yes'} odds={bkOdds?.bttsYes.best ?? parseFloat((1/(analysis.markets.btts.yes/100)*0.93).toFixed(2))} />
+                <MarketRow label={t('BTTS — No','BTTS — No')} prob={analysis.markets.btts.no} recommendation="no" isRec={analysis.markets.btts.recommendation==='no'} odds={bkOdds?.bttsNo.best ?? parseFloat((1/(analysis.markets.btts.no/100)*0.93).toFixed(2))} />
                 {bkOdds && (
                   <BookmakerOddsRow
                     marketOdds={analysis.markets.btts.recommendation === 'yes' ? bkOdds.bttsYes : bkOdds.bttsNo}
