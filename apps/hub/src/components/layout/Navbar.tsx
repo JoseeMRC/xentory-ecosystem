@@ -77,6 +77,15 @@ const AlertTriangle = () => (
     <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>
 );
+const JournalIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+);
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <polyline points="20 6 9 17 4 12"/>
@@ -289,8 +298,9 @@ export function Navbar() {
                     </div>
                     {/* Nav actions */}
                     {[
-                      { label: t('nav.dashboard'), icon: <DashIcon />, to: '/dashboard' },
-                      { label: t('nav.myplans'),   icon: <PlanIcon />, to: '/pricing'   },
+                      { label: t('nav.dashboard'), icon: <DashIcon />,     to: '/dashboard' },
+                      { label: t('nav.journal'),   icon: <JournalIcon />,  to: '/journal'   },
+                      { label: t('nav.myplans'),   icon: <PlanIcon />,     to: '/pricing'   },
                     ].map(item => (
                       <div key={item.to} onClick={() => { navigate(item.to); setUserMenu(false); }}
                         style={{ padding: '0.65rem 1rem', cursor: 'pointer', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text2)', transition: 'background 0.12s' }}
@@ -405,6 +415,15 @@ export function Navbar() {
                     boxShadow: '0 4px 20px rgba(201,168,76,0.3)',
                   }}>
                     <DashIcon /> {t('nav.dashboard')}
+                  </Link>
+                  {/* Journal link */}
+                  <Link to="/journal" onClick={() => setMob(false)} style={{
+                    textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    padding: '0.8rem 1rem', borderRadius: 12, minHeight: 48,
+                    background: 'var(--card2)', border: '1px solid var(--border)',
+                    color: 'var(--text2)', fontSize: '0.9rem', fontWeight: 600,
+                  }}>
+                    <JournalIcon /> {t('nav.journal')}
                   </Link>
                   {/* Account buttons */}
                   <div className="hub-mob-acct-btns">

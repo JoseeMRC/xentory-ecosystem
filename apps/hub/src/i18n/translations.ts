@@ -15,6 +15,7 @@ export const translations = {
   'nav.signup':        { es: 'Registrarse',       en: 'Sign up' },
   'nav.signout':       { es: 'Cerrar sesión',     en: 'Sign out' },
   'nav.myplans':       { es: 'Mis planes',        en: 'My plans' },
+  'nav.journal':       { es: 'Mi Registro',       en: 'My Journal' },
   'nav.lightmode':     { es: 'Modo claro',        en: 'Light mode' },
   'nav.darkmode':      { es: 'Modo oscuro',       en: 'Dark mode' },
   'nav.settings.email':    { es: 'Modificar correo',  en: 'Change email' },
