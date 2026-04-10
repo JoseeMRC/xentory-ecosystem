@@ -18,7 +18,8 @@ const BlogPostPage    = lazy(() => import('./components/blog/BlogPages').then(m 
 const AuthCallbackPage  = lazy(() => import('./components/auth/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const ResetPasswordPage = lazy(() => import('./components/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
 const TermsPage           = lazy(() => import('./components/legal/TermsPage').then(m => ({ default: m.TermsPage })));
-const BettingJournalPage  = lazy(() => import('./components/journal/BettingJournalPage').then(m => ({ default: m.BettingJournalPage })));
+const BettingJournalPage      = lazy(() => import('./components/journal/BettingJournalPage').then(m => ({ default: m.BettingJournalPage })));
+const InvestmentJournalPage   = lazy(() => import('./components/portfolio/InvestmentJournalPage').then(m => ({ default: m.InvestmentJournalPage })));
 
 function PageSkeleton() {
   return (
@@ -61,6 +62,7 @@ function AppRoutes() {
       <Route path="/register"    element={user ? <Navigate to="/dashboard" replace /> : <Layout hideFooter><AuthPage key="register" defaultTab="register" /></Layout>} />
       <Route path="/dashboard"   element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
       <Route path="/journal"    element={<ProtectedRoute><Layout><BettingJournalPage /></Layout></ProtectedRoute>} />
+      <Route path="/portfolio"  element={<ProtectedRoute><Layout><InvestmentJournalPage /></Layout></ProtectedRoute>} />
       <Route path="/auth/callback"   element={<AuthCallbackPage />} />
       <Route path="/reset-password"  element={<ResetPasswordPage />} />
       <Route path="/terminos"       element={<Layout><TermsPage /></Layout>} />

@@ -45,6 +45,15 @@ const IconCasas = () => (
     <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
   </svg>
 );
+const IconJournal = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+);
 const IconSignOut = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
@@ -73,6 +82,8 @@ function NavContent({ onNav, hideSports }: { onNav?: () => void; hideSports?: bo
     { to: '/telegram',  icon: <IconTelegram />,  label: 'Telegram'                           },
     { to: '/plans',     icon: <IconPlans />,     label: t('Planes',          'Plans')        },
   ];
+
+  const journalHref = `${HUB_URL}/journal`;
 
   const PLAN_LABELS: Record<string, string> = { free: t('Básico', 'Basic'), pro: 'Pro', elite: 'Elite' };
 
@@ -115,6 +126,29 @@ function NavContent({ onNav, hideSports }: { onNav?: () => void; hideSports?: bo
             )}
           </NavLink>
         ))}
+
+        {/* ── Mi Registro — external link to Hub journal ── */}
+        <div style={{ margin: '0.3rem 0 0.1rem', padding: '0 0.8rem' }}>
+          <div style={{ height: 1, background: 'var(--border)' }} />
+        </div>
+        <a
+          href={journalHref}
+          onClick={() => onNav?.()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.7rem',
+            padding: '0.52rem 0.8rem', borderRadius: 7, textDecoration: 'none',
+            fontSize: '0.85rem', fontWeight: 300,
+            color: 'var(--muted)',
+            background: 'transparent',
+            borderLeft: '2px solid transparent',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--card2)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'transparent'; }}
+        >
+          <span style={{ opacity: 0.75, flexShrink: 0, display: 'flex' }}><IconJournal /></span>
+          <span style={{ flex: 1 }}>{t('Mi Registro', 'My Journal')}</span>
+        </a>
       </nav>
 
       <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderTop: '1px solid var(--border)' }}>
