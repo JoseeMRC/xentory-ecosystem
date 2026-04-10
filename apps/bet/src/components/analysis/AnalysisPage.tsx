@@ -120,55 +120,57 @@ function buildComboSelections(
   bkOdds:   MatchBookmakerOdds | null,
   match:    Match,
 ): ComboSelection[] {
-  const sels: ComboSelection[] = [];
   const sport = match.sport;
+  const candidates: (ComboSelection & { prob: number })[] = [];
 
-  // 1. Result (1X2 / Winner)
+  // 1. Result (1X2 / Winner) — always a candidate
   const rec     = analysis.markets.result.recommendation as 'home' | 'draw' | 'away';
   const recProb = analysis.markets.result[rec];
-  if (recProb >= 55) {
-    const odds = rec === 'home'
-      ? (bkOdds?.result.home.perBookmaker.bet365 ?? analysis.markets.result.homeOdds)
-      : rec === 'away'
-        ? (bkOdds?.result.away.perBookmaker.bet365 ?? analysis.markets.result.awayOdds)
-        : (bkOdds?.result.draw.perBookmaker.bet365 ?? analysis.markets.result.drawOdds);
-    const label = rec === 'home'
-      ? `${match.homeTeam.name} gana`
-      : rec === 'away'
-        ? `${match.awayTeam.name} gana`
-        : 'Empate';
-    if (odds && odds > 1.01) sels.push({ label, market: sport === 'football' ? '1X2' : 'Ganador', odds });
+  const recOdds = rec === 'home'
+    ? (bkOdds?.result.home.perBookmaker.bet365 ?? analysis.markets.result.homeOdds)
+    : rec === 'away'
+      ? (bkOdds?.result.away.perBookmaker.bet365 ?? analysis.markets.result.awayOdds)
+      : (bkOdds?.result.draw.perBookmaker.bet365 ?? analysis.markets.result.drawOdds);
+  const recLabel = rec === 'home'
+    ? `${match.homeTeam.name} gana`
+    : rec === 'away' ? `${match.awayTeam.name} gana` : 'Empate';
+  if (recOdds && recOdds > 1.01) {
+    candidates.push({ label: recLabel, market: sport === 'football' ? '1X2' : 'Ganador', odds: recOdds, prob: recProb });
   }
 
-  // 2. Over/Under
+  // 2. Over/Under — always a candidate
   const ouRec  = analysis.markets.overUnder25.recommendation as 'over' | 'under';
   const ouProb = analysis.markets.overUnder25[ouRec];
-  if (ouProb >= 55) {
-    const odds = ouRec === 'over'
-      ? (bkOdds?.over25.perBookmaker.bet365  ?? parseFloat((1 / (ouProb / 100) * 0.94).toFixed(2)))
-      : (bkOdds?.under25.perBookmaker.bet365 ?? parseFloat((1 / (ouProb / 100) * 0.94).toFixed(2)));
-    const label = sport === 'basketball'
-      ? (ouRec === 'over' ? 'Over 210.5 puntos' : 'Under 210.5 puntos')
-      : sport === 'tennis'
-        ? (ouRec === 'over' ? 'Más de 2.5 sets' : 'Menos de 2.5 sets')
-        : (ouRec === 'over' ? 'Over 2.5 goles' : 'Under 2.5 goles');
-    if (odds && odds > 1.01) sels.push({ label, market: 'O/U', odds });
+  const ouOdds = ouRec === 'over'
+    ? (bkOdds?.over25.perBookmaker.bet365  ?? bkOdds?.over25.best  ?? parseFloat((1 / (ouProb / 100) * 0.93).toFixed(2)))
+    : (bkOdds?.under25.perBookmaker.bet365 ?? bkOdds?.under25.best ?? parseFloat((1 / (ouProb / 100) * 0.93).toFixed(2)));
+  const ouLabel = sport === 'basketball'
+    ? (ouRec === 'over' ? 'Over 210.5 puntos' : 'Under 210.5 puntos')
+    : sport === 'tennis'
+      ? (ouRec === 'over' ? 'Más de 2.5 sets' : 'Menos de 2.5 sets')
+      : (ouRec === 'over' ? 'Over 2.5 goles' : 'Under 2.5 goles');
+  if (ouOdds && ouOdds > 1.01) {
+    candidates.push({ label: ouLabel, market: 'O/U', odds: ouOdds, prob: ouProb });
   }
 
-  // 3. BTTS — football only
+  // 3. BTTS — football only, as optional third pick
   if (sport === 'football') {
     const bttsRec  = analysis.markets.btts.recommendation as 'yes' | 'no';
     const bttsProb = analysis.markets.btts[bttsRec];
-    if (bttsProb >= 60) {
-      const odds = bttsRec === 'yes'
-        ? bkOdds?.bttsYes.perBookmaker.bet365
-        : bkOdds?.bttsNo.perBookmaker.bet365;
-      const label = bttsRec === 'yes' ? 'Ambos marcan — Sí' : 'Ambos marcan — No';
-      if (odds && odds > 1.01) sels.push({ label, market: 'BTTS', odds });
+    const bttsOdds = bttsRec === 'yes'
+      ? (bkOdds?.bttsYes.perBookmaker.bet365 ?? bkOdds?.bttsYes.best ?? parseFloat((1 / (bttsProb / 100) * 0.93).toFixed(2)))
+      : (bkOdds?.bttsNo.perBookmaker.bet365  ?? bkOdds?.bttsNo.best  ?? parseFloat((1 / (bttsProb / 100) * 0.93).toFixed(2)));
+    const bttsLabel = bttsRec === 'yes' ? 'Ambos marcan — Sí' : 'Ambos marcan — No';
+    if (bttsOdds && bttsOdds > 1.01) {
+      candidates.push({ label: bttsLabel, market: 'BTTS', odds: bttsOdds, prob: bttsProb });
     }
   }
 
-  return sels.slice(0, 3); // max 3 selections
+  // Sort by confidence desc, take top 3
+  return candidates
+    .sort((a, b) => b.prob - a.prob)
+    .slice(0, 3)
+    .map(({ label, market, odds }) => ({ label, market, odds }));
 }
 
 function ComboBetCard({
