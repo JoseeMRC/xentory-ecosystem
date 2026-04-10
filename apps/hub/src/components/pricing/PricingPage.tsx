@@ -48,6 +48,8 @@ export function PricingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  useEffect(() => { document.title = 'Precios · Xentory'; }, []);
+
   const initialTab = (['market','bets','bundle'] as PlatformTab[]).includes(searchParams.get('tab') as PlatformTab)
     ? searchParams.get('tab') as PlatformTab : 'market';
   const initialPlan = searchParams.get('plan') as Plan | null;

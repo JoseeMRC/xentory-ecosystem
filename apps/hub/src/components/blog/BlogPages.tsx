@@ -168,6 +168,8 @@ export function BlogPage() {
   const [activeCategory,   setActiveCategory]   = useState<string>('all');
   const [search,           setSearch]           = useState('');
   const [newsQuery,        setNewsQuery]         = useState('');
+
+  useEffect(() => { document.title = 'Blog · Xentory'; }, []);
   const [showSuggestions,  setShowSuggestions]  = useState(false);
 
   const inputRef    = useRef<HTMLInputElement>(null);

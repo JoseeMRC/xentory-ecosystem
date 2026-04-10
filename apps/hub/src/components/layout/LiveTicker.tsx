@@ -120,19 +120,33 @@ function runEngine(
     })
     .catch(() => {});
 
-  // 2. Frankfurter forex
+  // 2. Frankfurter forex — with exponential backoff retry
   const FX = CRYPTO.length;
+  let fxFails = 0;
+  let fxRetryT: ReturnType<typeof setTimeout> | null = null;
   const pollFx = () => {
     if (dead) return;
-    fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP')
-      .then(r => r.json())
-      .then((d: { rates: { USD: number; GBP: number } }) => {
+    // Try two CORS-friendly forex endpoints
+    const urls = [
+      'https://api.frankfurter.app/latest?from=EUR&to=USD,GBP',
+      'https://api.fxratesapi.com/latest?base=EUR&symbols=USD,GBP',
+    ];
+    fetch(urls[fxFails % urls.length])
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then((d: { rates?: { USD?: number; GBP?: number } }) => {
         if (dead) return;
-        const { USD: usd, GBP: gbp } = d.rates ?? {};
+        fxFails = 0; // reset on success
+        const usd = d.rates?.USD;
+        const gbp = d.rates?.GBP;
         if (usd)        patch(FX,     usd,       opens[FX]     || usd);
         if (usd && gbp) patch(FX + 1, usd / gbp, opens[FX + 1] || usd / gbp);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (dead) return;
+        fxFails++;
+        const delay = Math.min(2_000 * 2 ** Math.min(fxFails, 5), 32_000);
+        fxRetryT = setTimeout(pollFx, delay);
+      });
   };
   pollFx();
   const fxTimer = setInterval(pollFx, 60_000);
@@ -168,7 +182,8 @@ function runEngine(
     dead = true;
     clearInterval(fxTimer);
     cancelAnimationFrame(rafId);
-    if (retryT) clearTimeout(retryT);
+    if (retryT)    clearTimeout(retryT);
+    if (fxRetryT)  clearTimeout(fxRetryT);
     ws?.close();
   };
 }

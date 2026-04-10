@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSignals, formatUnlockTime } from '../../hooks/useSignals';
@@ -208,6 +208,8 @@ export function MetodologiaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const plan = user?.subscriptions?.market ?? user?.subscriptions?.bets ?? null;
+
+  useEffect(() => { document.title = 'Metodología · Xentory'; }, []);
 
   const [tab, setTab] = useState<PlatformTab>('both');
 

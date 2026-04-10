@@ -379,6 +379,8 @@ export function HomePage() {
 
   const TESTIMONIALS = lang === 'es' ? TESTIMONIALS_ES : TESTIMONIALS_EN;
 
+  useEffect(() => { document.title = 'Xentory — Análisis financiero y deportivo con IA'; }, []);
+
   // Real accuracy stat from DB — falls back to 68% if DB has no data yet
   const { data: accData } = useAccuracyStats('both', 6);
   const accuracyPct = accData?.stats.accuracy_pct ?? 68;
@@ -412,13 +414,17 @@ export function HomePage() {
 
   // Scroll reveal
   useEffect(() => {
+    const forceVisible = () =>
+      document.querySelectorAll<HTMLElement>('.reveal:not(.visible)').forEach(el => el.classList.add('visible'));
     const io = new IntersectionObserver(entries => {
       entries.forEach(e => { if (e.isIntersecting) { (e.target as HTMLElement).classList.add('visible'); io.unobserve(e.target); } });
-    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+    }, { threshold: 0.05, rootMargin: '0px 0px 100px 0px' }); // pre-reveal 100px before entering viewport
     const observe = () => document.querySelectorAll<HTMLElement>('.reveal:not(.visible)').forEach(el => io.observe(el));
     observe();
-    const tid = setTimeout(observe, 120);
-    return () => { clearTimeout(tid); io.disconnect(); };
+    const tid1 = setTimeout(observe, 120);
+    const tid2 = setTimeout(observe, 600);        // second pass after lazy-loaded content
+    const fail = setTimeout(forceVisible, 3000);  // nuclear fallback: force all visible after 3s
+    return () => { clearTimeout(tid1); clearTimeout(tid2); clearTimeout(fail); io.disconnect(); };
   }, []);
 
   // Exit intent
@@ -473,7 +479,7 @@ export function HomePage() {
           <button onClick={() => { trackEvent('cta_click', { cta: 'hero_primary', destination: user ? 'dashboard' : 'register' }); navigate(user ? '/dashboard' : '/register'); }} className="btn btn-gold btn-xl" style={{ gap: '0.6rem' }}>
             {user ? t('hero.cta1.user') : t('hero.cta1')} <IconArrow />
           </button>
-          <button onClick={() => { trackEvent('cta_click', { cta: 'hero_secondary' }); document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }); }} className="btn btn-outline btn-xl">
+          <button onClick={() => { trackEvent('cta_click', { cta: 'hero_secondary' }); document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }); }} className="btn btn-ghost" style={{ color: 'var(--text2)', fontSize: '0.9rem', padding: '0.65rem 1.2rem', textDecoration: 'underline', textDecorationColor: 'var(--border2)', textUnderlineOffset: '3px' }}>
             {t('hero.cta2')}
           </button>
         </div>

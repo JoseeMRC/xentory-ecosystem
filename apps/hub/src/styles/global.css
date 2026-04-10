@@ -300,6 +300,14 @@ h1, h2, h3, h4, h5, h6 {
               transform 0.75s cubic-bezier(0.16,1,0.3,1);
   will-change: opacity, transform;
 }
+/* Fallback: sin animaciones o JS no disponible */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
 /* Variantes de dirección */
 .reveal.reveal-up    { transform: translate3d(0, 36px, 0); }
 .reveal.reveal-left  { transform: translate3d(-40px, 0, 0); }
