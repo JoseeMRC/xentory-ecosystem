@@ -198,7 +198,13 @@ export function Navbar() {
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
       {/* Ticker toggle — desktop only, home only */}
       {isHome && (
-        <span className="nav-ticker-toggle" style={{ display: 'none', alignItems: 'center', gap: '0.3rem', marginRight: '0.2rem' }}>
+        <span className="nav-ticker-toggle" style={{ display: 'none', alignItems: 'center', gap: '0.45rem', marginRight: '0.2rem' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <span className="live-dot" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: tickerOn ? 'var(--green)' : 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase', transition: 'color 0.22s', userSelect: 'none' }}>
+              {lang === 'es' ? 'En vivo' : 'Live'}
+            </span>
+          </span>
           <TickerToggle />
         </span>
       )}
