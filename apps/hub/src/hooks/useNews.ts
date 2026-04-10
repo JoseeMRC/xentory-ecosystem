@@ -66,13 +66,13 @@ const GU_SECTION: Record<string, string> = {
   stocks:   'business',
   platform: 'technology',
   sports:   'sport',
-  all:      'world',
+  all:      'business',           // was 'world' — caused unrelated news to appear
 };
 const GU_QUERY: Record<string, string> = {
   stocks:   'stock market shares nasdaq earnings',
   platform: 'fintech AI trading investment technology',
   sports:   'football soccer champions league NBA',
-  all:      'world news business finance sport',
+  all:      'finance investment trading markets cryptocurrency sport',
 };
 
 function mapGuardian(a: any, category: string): NewsArticle {

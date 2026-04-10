@@ -129,6 +129,8 @@ export function DashboardPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [launching, setLaunching] = useState<'market' | 'bets' | null>(null);
 
+  useEffect(() => { document.title = 'Dashboard · Xentory'; }, []);
+
   // Onboarding preferences — drive personalization
   const prefPlatform = readPref('xentory_pref_platform'); // 'market'|'sports'|'both'
   const prefAnalysis = readPref('xentory_pref_analysis'); // 'btc'|'match'|'portfolio'

@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useLang } from '../../context/LanguageContext';
 
-const LOGO_CYAN = 'var(--cyan)';
+const LOGO_CYAN  = 'var(--cyan)';
+const MARKET_URL = (import.meta as any).env?.VITE_MARKET_URL  ?? 'https://xentory-ecosystem-market.vercel.app';
+const BETS_URL   = (import.meta as any).env?.VITE_BETS_URL    ?? 'https://xentory-bet.vercel.app';
+const TG_URL     = (import.meta as any).env?.VITE_TELEGRAM_URL ?? 'https://t.me/xentory';
 
 export function Footer() {
   const { t } = useLang();
@@ -11,9 +14,9 @@ export function Footer() {
     {
       title: t('footer.platforms'),
       links: [
-        { label: t('footer.market'),    to: '#' },
-        { label: t('footer.bet'),       to: '#' },
-        { label: t('footer.telegram'),  to: '#' },
+        { label: t('footer.market'),  to: MARKET_URL },
+        { label: t('footer.bet'),     to: BETS_URL   },
+        { label: 'Telegram',          to: TG_URL     },
       ],
     },
     {
@@ -27,9 +30,9 @@ export function Footer() {
     {
       title: t('footer.legal'),
       links: [
-        { label: t('footer.terms'),   to: '/terminos' },
-        { label: t('footer.privacy'), to: '/terminos' },
-        { label: t('footer.cookies'), to: '/terminos' },
+        { label: t('footer.terms'),   to: '/terminos'   },
+        { label: t('footer.privacy'), to: '/privacidad' },
+        { label: t('footer.cookies'), to: '/terminos'   },
       ],
     },
   ];
