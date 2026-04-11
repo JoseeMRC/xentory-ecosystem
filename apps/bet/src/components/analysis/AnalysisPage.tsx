@@ -619,14 +619,16 @@ export function MatchAnalysisPage() {
               ) : match.sport === 'basketball' ? (
                 <>
                   <h3 style={{ fontSize:'0.9rem', marginBottom:'1rem' }}>📊 {t('Puntos Over/Under','Points Over/Under')}</h3>
-                  <MarketRow label={t('Over 210.5 puntos','Over 210.5 points')} prob={analysis.markets.overUnder25.over} recommendation="over" isRec={analysis.markets.overUnder25.recommendation==='over'} odds={parseFloat((1/(analysis.markets.overUnder25.over/100)*0.92).toFixed(2))} />
-                  <MarketRow label={t('Under 210.5 puntos','Under 210.5 points')} prob={analysis.markets.overUnder25.under} recommendation="under" isRec={analysis.markets.overUnder25.recommendation==='under'} />
+                  <MarketRow label={t('Over 210.5 puntos','Over 210.5 points')} prob={analysis.markets.overUnder25.over} recommendation="over" isRec={analysis.markets.overUnder25.recommendation==='over'} odds={bkOdds?.over25.best ?? parseFloat((1/(analysis.markets.overUnder25.over/100)*0.92).toFixed(2))} />
+                  <MarketRow label={t('Under 210.5 puntos','Under 210.5 points')} prob={analysis.markets.overUnder25.under} recommendation="under" isRec={analysis.markets.overUnder25.recommendation==='under'} odds={bkOdds?.under25.best ?? parseFloat((1/(analysis.markets.overUnder25.under/100)*0.92).toFixed(2))} />
+                  {bkOdds && <BookmakerOddsRow marketOdds={analysis.markets.overUnder25.recommendation === 'over' ? bkOdds.over25 : bkOdds.under25} />}
                 </>
               ) : match.sport === 'tennis' ? (
                 <>
                   <h3 style={{ fontSize:'0.9rem', marginBottom:'1rem' }}>📊 {t('Sets Over/Under','Sets Over/Under')}</h3>
-                  <MarketRow label={t('Over 2.5 sets','Over 2.5 sets')} prob={analysis.markets.overUnder25.over} recommendation="over" isRec={analysis.markets.overUnder25.recommendation==='over'} odds={parseFloat((1/(analysis.markets.overUnder25.over/100)*0.92).toFixed(2))} />
-                  <MarketRow label={t('Under 2.5 sets','Under 2.5 sets')} prob={analysis.markets.overUnder25.under} recommendation="under" isRec={analysis.markets.overUnder25.recommendation==='under'} />
+                  <MarketRow label={t('Over 2.5 sets','Over 2.5 sets')} prob={analysis.markets.overUnder25.over} recommendation="over" isRec={analysis.markets.overUnder25.recommendation==='over'} odds={bkOdds?.over25.best ?? parseFloat((1/(analysis.markets.overUnder25.over/100)*0.92).toFixed(2))} />
+                  <MarketRow label={t('Under 2.5 sets','Under 2.5 sets')} prob={analysis.markets.overUnder25.under} recommendation="under" isRec={analysis.markets.overUnder25.recommendation==='under'} odds={bkOdds?.under25.best ?? parseFloat((1/(analysis.markets.overUnder25.under/100)*0.92).toFixed(2))} />
+                  {bkOdds && <BookmakerOddsRow marketOdds={analysis.markets.overUnder25.recommendation === 'over' ? bkOdds.over25 : bkOdds.under25} />}
                 </>
               ) : (
                 <>
