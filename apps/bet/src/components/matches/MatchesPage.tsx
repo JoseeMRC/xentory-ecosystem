@@ -514,9 +514,12 @@ export function MatchesPage() {
       return (
         m.homeTeam.name.toLowerCase().includes(q) ||
         m.awayTeam.name.toLowerCase().includes(q) ||
+        (m.homeTeam.shortName?.toLowerCase().includes(q) ?? false) ||
+        (m.awayTeam.shortName?.toLowerCase().includes(q) ?? false) ||
         m.competition.name.toLowerCase().includes(q) ||
         (m.venue?.toLowerCase().includes(q) ?? false) ||
-        (m.round?.toLowerCase().includes(q) ?? false)
+        (m.round?.toLowerCase().includes(q) ?? false) ||
+        (m.leaderboard?.some(p => p.name.toLowerCase().includes(q)) ?? false)
       );
     });
 
