@@ -403,6 +403,18 @@ export function Navbar() {
               </span>
               <QuickControls />
             </div>
+            {/* Live ticker toggle — only on home page */}
+            {isHome && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderTop: '1px solid var(--border)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span className="live-dot" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.75rem', color: tickerOn ? 'var(--text2)' : 'var(--muted)', transition: 'color 0.22s' }}>
+                    {lang === 'es' ? 'En vivo' : 'Live ticker'}
+                  </span>
+                </span>
+                <TickerToggle />
+              </div>
+            )}
             <div style={{ paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {user ? (
                 <>
