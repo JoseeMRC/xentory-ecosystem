@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchWeekMatches, getMockMatchesBySport, fetchTennisMatches, fetchBasketballMatches, fetchF1Matches, fetchGolfMatches } from '../../services/sportsService';
 import { SPORT_CONFIG } from '../../constants';
 import { useLang } from '../../context/LanguageContext';
@@ -86,14 +85,119 @@ function parseGolfScoreColor(score: string): string {
   return 'var(--text)';
 }
 
+// ── GOLF STANDINGS MODAL ──
+function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => void }) {
+  const { lang } = useLang();
+  const leaderboard = match.leaderboard ?? [];
+  const matchDate   = new Date(match.date);
+  const locale      = lang === 'es' ? 'es-ES' : 'en-GB';
+  const dateStr     = matchDate.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' });
+
+  // Close on Escape
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [onClose]);
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(4,6,15,0.82)', backdropFilter: 'blur(8px)', zIndex: 1000, animation: 'fadeIn 0.2s ease' }}
+      />
+      {/* Modal */}
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(94vw, 520px)', maxHeight: '82vh',
+        background: 'var(--bg2)', borderRadius: 20, border: '1px solid var(--border2)',
+        boxShadow: '0 40px 100px rgba(0,0,0,0.7)',
+        zIndex: 1001, display: 'flex', flexDirection: 'column',
+        animation: 'fadeUp 0.22s ease',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '1.2rem 1.4rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: '#22c55e', marginBottom: '0.2rem' }}>
+              ⛳ {match.competition.name}
+            </div>
+            <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.2 }}>
+              {match.venue ?? match.competition.name}
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
+              {match.round && <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{match.round}</span>}
+              <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{dateStr}</span>
+              {leaderboard.length > 0 && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
+                  {leaderboard.length} {lang === 'es' ? 'jugadores' : 'players'}
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '0.25rem', fontSize: '1.2rem', lineHeight: 1, flexShrink: 0 }}
+          >✕</button>
+        </div>
+
+        {/* Column headers */}
+        <div style={{ padding: '0.5rem 1.4rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', fontSize: '0.6rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <span style={{ minWidth: 36 }}>{lang === 'es' ? 'Pos' : 'Pos'}</span>
+            <span style={{ flex: 1 }}>{lang === 'es' ? 'Jugador' : 'Player'}</span>
+            <span style={{ minWidth: 48, textAlign: 'right' }}>Score</span>
+            <span style={{ minWidth: 40, textAlign: 'right' }}>{lang === 'es' ? 'Hoyo' : 'Thru'}</span>
+          </div>
+        </div>
+
+        {/* Scrollable list */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '0.4rem 0.8rem 1.2rem' }}>
+          {leaderboard.length === 0 ? (
+            <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
+              {lang === 'es' ? 'Sin datos de clasificación' : 'No leaderboard data available'}
+            </div>
+          ) : leaderboard.map((p, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center',
+              padding: '0.42rem 0.6rem', borderRadius: 8,
+              background: i === 0 ? 'rgba(201,168,76,0.08)' : i < 3 ? 'rgba(255,255,255,0.025)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
+              marginBottom: '0.06rem',
+            }}>
+              <span style={{ minWidth: 36, fontSize: '0.72rem', color: i < 3 ? 'var(--gold)' : 'var(--muted)', fontWeight: i < 3 ? 700 : 400 }}>
+                {p.pos}
+              </span>
+              <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: i === 0 ? 700 : 400, color: i === 0 ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.name}
+              </span>
+              <span style={{ minWidth: 48, textAlign: 'right', fontSize: '0.88rem', fontWeight: 700, color: parseGolfScoreColor(p.score) }}>
+                {p.score}
+              </span>
+              <span style={{ minWidth: 40, textAlign: 'right', fontSize: '0.72rem', color: 'var(--muted)' }}>
+                {p.thru}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── GOLF TOURNAMENT CARD ──
-function GolfCard({ match, onClick }: { match: Match; onClick: () => void }) {
+function GolfCard({ match, onClick, onViewStandings }: { match: Match; onClick: () => void; onViewStandings: () => void }) {
   const { lang } = useLang();
   const matchDate = new Date(match.date);
   const locale = lang === 'es' ? 'es-ES' : 'en-GB';
   const dateStr = matchDate.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'Europe/Madrid' });
   const liveStyle = { fontSize: '0.65rem', padding: '0.15rem 0.5rem', borderRadius: 100, background: 'rgba(255,68,85,0.15)', color: 'var(--red)', border: '1px solid rgba(255,68,85,0.25)', animation: 'pulse 2s infinite', whiteSpace: 'nowrap' } as const;
   const finStyle  = { fontSize: '0.65rem', padding: '0.15rem 0.5rem', borderRadius: 100, background: 'rgba(107,114,148,0.15)', color: 'var(--muted)', border: '1px solid rgba(107,114,148,0.25)' } as const;
+
+  const handleLeaderboardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onViewStandings();
+  };
+
   return (
     <div
       onClick={onClick}
@@ -102,7 +206,7 @@ function GolfCard({ match, onClick }: { match: Match; onClick: () => void }) {
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
     >
-      {/* Header */}
+      {/* Header — click here navigates to analysis */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.8rem' }}>
         <div>
           <div style={{ fontSize: '0.72rem', color: '#22c55e', marginBottom: '0.25rem' }}>
@@ -120,21 +224,30 @@ function GolfCard({ match, onClick }: { match: Match; onClick: () => void }) {
         </div>
       </div>
 
-      {/* Leaderboard */}
+      {/* Leaderboard preview — clicking opens standings modal, NOT analysis */}
       {match.leaderboard && match.leaderboard.length > 0 ? (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', padding: '0 0.3rem' }}>
+        <div
+          onClick={handleLeaderboardClick}
+          style={{ borderRadius: 8, padding: '0.3rem', background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.1)', cursor: 'pointer' }}
+          title={lang === 'es' ? 'Ver clasificación completa' : 'View full leaderboard'}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem', padding: '0 0.3rem' }}>
             <span>{lang === 'es' ? 'Pos · Jugador' : 'Pos · Player'}</span>
             <span>Score · {lang === 'es' ? 'Hoyo' : 'Thru'}</span>
           </div>
-          {match.leaderboard.slice(0, 6).map((p, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '0.2rem 0.3rem', borderRadius: 6, background: i === 0 ? 'rgba(201,168,76,0.1)' : i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent', marginBottom: '0.08rem' }}>
+          {match.leaderboard.slice(0, 5).map((p, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '0.22rem 0.3rem', borderRadius: 6, background: i === 0 ? 'rgba(201,168,76,0.1)' : 'transparent', marginBottom: '0.05rem' }}>
               <span style={{ fontSize: '0.68rem', color: 'var(--muted)', minWidth: 30, fontWeight: i === 0 ? 700 : 400 }}>{p.pos}</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: i === 0 ? 700 : 400, flex: 1, color: i === 0 ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: parseGolfScoreColor(p.score), minWidth: 34, textAlign: 'right' }}>{p.score}</span>
+              <span style={{ fontSize: '0.83rem', fontWeight: i === 0 ? 700 : 400, flex: 1, color: i === 0 ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+              <span style={{ fontSize: '0.83rem', fontWeight: 700, color: parseGolfScoreColor(p.score), minWidth: 34, textAlign: 'right' }}>{p.score}</span>
               <span style={{ fontSize: '0.68rem', color: 'var(--muted)', minWidth: 28, textAlign: 'right' }}>{p.thru}</span>
             </div>
           ))}
+          {match.leaderboard.length > 5 && (
+            <div style={{ textAlign: 'center', fontSize: '0.65rem', color: '#22c55e', paddingTop: '0.3rem', fontWeight: 600 }}>
+              +{match.leaderboard.length - 5} {lang === 'es' ? 'jugadores más' : 'more players'} →
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '0.8rem 0', color: 'var(--muted)', fontSize: '0.82rem' }}>
@@ -149,9 +262,19 @@ function GolfCard({ match, onClick }: { match: Match; onClick: () => void }) {
         <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
           {match.totalPlayers ? `${match.totalPlayers} ${lang === 'es' ? 'jugadores' : 'players'}` : dateStr}
         </span>
-        <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 500 }}>
-          {lang === 'es' ? 'Ver clasificación →' : 'View leaderboard →'}
-        </span>
+        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+          {match.leaderboard && match.leaderboard.length > 0 && (
+            <span
+              onClick={handleLeaderboardClick}
+              style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600, cursor: 'pointer' }}
+            >
+              {lang === 'es' ? 'Ver clasificación →' : 'View leaderboard →'}
+            </span>
+          )}
+          <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
+            {lang === 'es' ? 'Análisis →' : 'Analysis →'}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -253,8 +376,8 @@ function MatchCard({ match, query, onClick }: { match: Match; query: string; onC
 }
 
 // ── EVENT CARD — routes to GolfCard or MatchCard based on sport ──
-function EventCard({ match, query, onClick }: { match: Match; query: string; onClick: () => void }) {
-  if (match.sport === 'golf') return <GolfCard match={match} onClick={onClick} />;
+function EventCard({ match, query, onClick, onViewStandings }: { match: Match; query: string; onClick: () => void; onViewStandings?: () => void }) {
+  if (match.sport === 'golf') return <GolfCard match={match} onClick={onClick} onViewStandings={onViewStandings ?? onClick} />;
   return <MatchCard match={match} query={query} onClick={onClick} />;
 }
 
@@ -277,6 +400,7 @@ export function MatchesPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showMoreComps, setShowMoreComps] = useState(false);
+  const [standingsMatch, setStandingsMatch] = useState<Match | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const moreRef   = useRef<HTMLDivElement>(null);
 
@@ -716,7 +840,7 @@ export function MatchesPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
             {visibleMatches.map(match => (
-              <EventCard key={match.id} match={match} query={query} onClick={() => navigate(`/matches/${match.id}`, { state: { match } })} />
+              <EventCard key={match.id} match={match} query={query} onClick={() => navigate(`/matches/${match.id}`, { state: { match } })} onViewStandings={() => setStandingsMatch(match)} />
             ))}
           </div>
         </>
@@ -777,7 +901,7 @@ export function MatchesPage() {
                           )}
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.8rem', marginBottom: played.length > 0 ? '1rem' : 0 }}>
                             {pending.map(match => (
-                              <EventCard key={match.id} match={match} query="" onClick={() => navigate(`/matches/${match.id}`, { state: { match } })} />
+                              <EventCard key={match.id} match={match} query="" onClick={() => navigate(`/matches/${match.id}`, { state: { match } })} onViewStandings={() => setStandingsMatch(match)} />
                             ))}
                           </div>
                         </>
@@ -793,7 +917,7 @@ export function MatchesPage() {
                           )}
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.8rem', opacity: 0.7 }}>
                             {played.map(match => (
-                              <EventCard key={match.id} match={match} query="" onClick={() => navigate(`/matches/${match.id}`, { state: { match } })} />
+                              <EventCard key={match.id} match={match} query="" onClick={() => navigate(`/matches/${match.id}`, { state: { match } })} onViewStandings={() => setStandingsMatch(match)} />
                             ))}
                           </div>
                         </>
@@ -808,6 +932,11 @@ export function MatchesPage() {
             {visibleMatches.length} {match_word(visibleMatches.length)} {t('en total', 'total')}
           </div>
         </>
+      )}
+
+      {/* Golf standings modal */}
+      {standingsMatch && (
+        <GolfStandingsModal match={standingsMatch} onClose={() => setStandingsMatch(null)} />
       )}
     </div>
   );
