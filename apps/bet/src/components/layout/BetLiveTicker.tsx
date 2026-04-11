@@ -12,15 +12,17 @@ import { fetchAllLiveMatches } from '../../services/sportsService';
 import { SPORT_CONFIG } from '../../constants';
 import type { Match } from '../../types';
 
+const TICKER_COPIES = 4;
+
 function buildTickerHTML(matches: Match[]): string {
   if (matches.length === 0) return '';
-  const item = (m: Match, clone: boolean) => {
+  const item = (m: Match, isReal: boolean) => {
     const sport     = SPORT_CONFIG[m.sport as keyof typeof SPORT_CONFIG];
     const homeScore = m.homeScore ?? 0;
     const awayScore = m.awayScore ?? 0;
     const clock     = m.clockDisplay ?? (m.minute ? `${m.minute}'` : 'LIVE');
     return `<span
-      ${clone ? 'aria-hidden="true"' : `data-mid="${m.id}"`}
+      ${isReal ? `data-mid="${m.id}"` : 'aria-hidden="true"'}
       style="display:inline-flex;align-items:center;gap:0.5rem;padding:0 1.8rem;border-right:1px solid rgba(255,255,255,0.06);flex-shrink:0;cursor:pointer;"
     >
       <span style="font-size:0.7rem">${sport?.emoji ?? '🏟️'}</span>
@@ -30,8 +32,10 @@ function buildTickerHTML(matches: Match[]): string {
       <span class="bet-tk-clock" style="font-size:0.62rem;color:rgba(255,68,85,0.8);background:rgba(255,68,85,0.1);padding:0.1rem 0.4rem;border-radius:4px;border:1px solid rgba(255,68,85,0.2)">${clock}</span>
     </span>`;
   };
-  return matches.map(m => item(m, false)).join('') +
-         matches.map(m => item(m, true)).join('');
+  // First copy is real (has data-mid for click navigation), rest are clones for seamless looping
+  return Array.from({ length: TICKER_COPIES }, (_, ci) =>
+    matches.map(m => item(m, ci === 0)).join('')
+  ).join('');
 }
 
 function buildEmptyHTML(): string {
@@ -57,12 +61,12 @@ export function BetLiveTicker() {
   function startEngine(track: HTMLElement) {
     cancelAnimationFrame(rafRef.current);
 
-    // Measure half-width AFTER layout
-    const hw = track.scrollWidth / 2;
+    // Measure one loop segment width AFTER layout
+    const hw = track.scrollWidth / TICKER_COPIES;
     halfWRef.current = hw;
     if (hw <= 0) return;
 
-    // Speed: traverse half-width in N seconds; faster on mobile
+    // Speed: traverse one loop segment in N seconds; faster on mobile
     const isMob  = window.innerWidth <= 768;
     const secs   = isMob ? 15 : 22;
     const speed  = hw / secs; // px / second
