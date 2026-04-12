@@ -287,10 +287,16 @@ export async function fetchAllLiveMatches(): Promise<Match[]> {
     { slug: 'basketball/euroleague',          name: 'EuroLeague', emoji: '🏀', country: 'Europa', id: 17,  baseId: 25000 },
   ];
 
+  // ── Football leagues shown in live ticker (6 key competitions) ───────────
+  const TICKER_FOOTBALL = FOOTBALL_LEAGUES.filter(l =>
+    [2, 3, 140, 141, 39, 135].includes(l.id)
+    // Champions, Europa, LaLiga, LaLiga 2, Premier League, Serie A
+  );
+
   // ── All sources fetched in parallel ───────────────────────────────────────
   const allSettled = await Promise.allSettled([
-    // All football leagues
-    ...FOOTBALL_LEAGUES.map(async cfg => {
+    // Selected football leagues
+    ...TICKER_FOOTBALL.map(async cfg => {
       const json   = await espnFetchLive(`/${cfg.slug}/scoreboard`);
       const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
       return parseEspnFootballEvents(events, cfg);
@@ -323,10 +329,14 @@ export async function fetchAllLiveMatches(): Promise<Match[]> {
       return matches;
     }),
 
-    // All tennis tours
+    // All tennis tours — try primary slug, then altSlug if no live events
     ...TENNIS_LEAGUES.map(async tour => {
-      const json   = await espnFetchLive(`/${tour.slug}/scoreboard`);
-      const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
+      let json   = await espnFetchLive(`/${tour.slug}/scoreboard`);
+      let events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
+      if (events.length === 0 && tour.altSlug) {
+        json   = await espnFetchLive(`/${tour.altSlug}/scoreboard`);
+        events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
+      }
       const matches: Match[] = [];
       for (const ev of events) {
         const comp = ev.competitions?.[0];
