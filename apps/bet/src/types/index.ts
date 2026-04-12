@@ -49,7 +49,17 @@ export interface Match {
   period?: string;
   espnEventId?: string;
   // Golf-specific
-  leaderboard?: Array<{pos: string; name: string; score: string; thru: string}>;
+  leaderboard?: Array<{
+    pos: string;
+    name: string;
+    score: string;
+    /** 'F' = finished, a number string = current hole thru, '-' = not started */
+    thru: string;
+    /** ISO tee-time string for players yet to start */
+    teeTime?: string;
+    /** 'active' | 'cut' | 'wd' | 'mdf' | 'dq' */
+    playerStatus?: string;
+  }>;
   totalPlayers?: number;
 }
 

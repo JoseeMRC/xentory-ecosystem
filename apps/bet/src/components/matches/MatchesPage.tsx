@@ -86,12 +86,50 @@ function parseGolfScoreColor(score: string): string {
 }
 
 // ── GOLF STANDINGS MODAL ──
+/** Format a tee-time ISO string to local HH:MM */
+function fmtTeeTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
+  } catch { return iso; }
+}
+
+/** Badge for the "Thru" column — hole currently on, finished, or tee time */
+function ThruBadge({ p, lang }: { p: NonNullable<Match['leaderboard']>[number]; lang: string }) {
+  const st = p.playerStatus ?? '';
+  if (st === 'cut' || st === 'mdf') {
+    return <span style={{ fontSize: '0.62rem', color: 'var(--muted)', background: 'rgba(255,255,255,0.07)', padding: '0.1rem 0.38rem', borderRadius: 4, textTransform: 'uppercase', fontWeight: 600 }}>{st.toUpperCase()}</span>;
+  }
+  if (st === 'wd' || st === 'dq') {
+    return <span style={{ fontSize: '0.62rem', color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '0.1rem 0.38rem', borderRadius: 4, textTransform: 'uppercase', fontWeight: 600 }}>{st.toUpperCase()}</span>;
+  }
+  const thru = p.thru;
+  if (thru === 'F' || thru === 'Finalizado' || thru === 'Finished') {
+    return <span style={{ fontSize: '0.62rem', color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '0.1rem 0.38rem', borderRadius: 4, fontWeight: 700 }}>F</span>;
+  }
+  const holeNum = parseInt(thru);
+  if (!isNaN(holeNum)) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', color: 'var(--red)', background: 'rgba(255,68,85,0.1)', padding: '0.1rem 0.38rem', borderRadius: 4, border: '1px solid rgba(255,68,85,0.2)', fontWeight: 700 }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', boxShadow: '0 0 4px var(--red)', display: 'inline-block', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+        {lang === 'es' ? `H.${holeNum}` : `H.${holeNum}`}
+      </span>
+    );
+  }
+  // Not started — show tee time if available
+  if (p.teeTime) {
+    return <span style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>{fmtTeeTime(p.teeTime)}</span>;
+  }
+  return <span style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>–</span>;
+}
+
 function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => void }) {
   const { lang } = useLang();
   const leaderboard = match.leaderboard ?? [];
   const matchDate   = new Date(match.date);
   const locale      = lang === 'es' ? 'es-ES' : 'en-GB';
   const dateStr     = matchDate.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' });
+  const startTimeStr = matchDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
+  const isScheduled = match.status === 'scheduled';
 
   // Close on Escape
   useEffect(() => {
@@ -125,9 +163,19 @@ function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => v
             <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.2 }}>
               {match.venue ?? match.competition.name}
             </div>
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
-              {match.round && <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{match.round}</span>}
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {match.round && (
+                <span style={{ fontSize: '0.72rem', color: match.status === 'live' ? 'var(--red)' : 'var(--muted)', fontWeight: match.status === 'live' ? 600 : 400 }}>
+                  {match.status === 'live' && <span style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', marginRight: '0.3rem', animation: 'pulse 1.5s infinite', verticalAlign: 'middle' }} />}
+                  {match.round}
+                </span>
+              )}
               <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{dateStr}</span>
+              {isScheduled && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--gold)', fontWeight: 600, background: 'rgba(201,168,76,0.1)', padding: '0.1rem 0.5rem', borderRadius: 6 }}>
+                  ⏱ {lang === 'es' ? `Empieza a las ${startTimeStr}` : `Starts at ${startTimeStr}`}
+                </span>
+              )}
               {leaderboard.length > 0 && (
                 <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
                   {leaderboard.length} {lang === 'es' ? 'jugadores' : 'players'}
@@ -144,10 +192,12 @@ function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => v
         {/* Column headers */}
         <div style={{ padding: '0.5rem 1.4rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', fontSize: '0.6rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            <span style={{ minWidth: 36 }}>{lang === 'es' ? 'Pos' : 'Pos'}</span>
+            <span style={{ minWidth: 36 }}>Pos</span>
             <span style={{ flex: 1 }}>{lang === 'es' ? 'Jugador' : 'Player'}</span>
             <span style={{ minWidth: 48, textAlign: 'right' }}>Score</span>
-            <span style={{ minWidth: 40, textAlign: 'right' }}>{lang === 'es' ? 'Hoyo' : 'Thru'}</span>
+            <span style={{ minWidth: 52, textAlign: 'right' }}>
+              {isScheduled ? (lang === 'es' ? 'Salida' : 'Tee') : (lang === 'es' ? 'Hoyo' : 'Thru')}
+            </span>
           </div>
         </div>
 
@@ -157,27 +207,31 @@ function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => v
             <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
               {lang === 'es' ? 'Sin datos de clasificación' : 'No leaderboard data available'}
             </div>
-          ) : leaderboard.map((p, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center',
-              padding: '0.42rem 0.6rem', borderRadius: 8,
-              background: i === 0 ? 'rgba(201,168,76,0.08)' : i < 3 ? 'rgba(255,255,255,0.025)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
-              marginBottom: '0.06rem',
-            }}>
-              <span style={{ minWidth: 36, fontSize: '0.72rem', color: i < 3 ? 'var(--gold)' : 'var(--muted)', fontWeight: i < 3 ? 700 : 400 }}>
-                {p.pos}
-              </span>
-              <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: i === 0 ? 700 : 400, color: i === 0 ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.name}
-              </span>
-              <span style={{ minWidth: 48, textAlign: 'right', fontSize: '0.88rem', fontWeight: 700, color: parseGolfScoreColor(p.score) }}>
-                {p.score}
-              </span>
-              <span style={{ minWidth: 40, textAlign: 'right', fontSize: '0.72rem', color: 'var(--muted)' }}>
-                {p.thru}
-              </span>
-            </div>
-          ))}
+          ) : leaderboard.map((p, i) => {
+            const isCutOrOut = p.playerStatus === 'cut' || p.playerStatus === 'mdf' || p.playerStatus === 'wd' || p.playerStatus === 'dq';
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center',
+                padding: '0.42rem 0.6rem', borderRadius: 8,
+                background: i === 0 ? 'rgba(201,168,76,0.08)' : i < 3 ? 'rgba(255,255,255,0.025)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
+                marginBottom: '0.06rem',
+                opacity: isCutOrOut ? 0.55 : 1,
+              }}>
+                <span style={{ minWidth: 36, fontSize: '0.72rem', color: i < 3 && !isCutOrOut ? 'var(--gold)' : 'var(--muted)', fontWeight: i < 3 && !isCutOrOut ? 700 : 400 }}>
+                  {p.pos}
+                </span>
+                <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: i === 0 ? 700 : 400, color: i === 0 && !isCutOrOut ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name}
+                </span>
+                <span style={{ minWidth: 48, textAlign: 'right', fontSize: '0.88rem', fontWeight: 700, color: isCutOrOut ? 'var(--muted)' : parseGolfScoreColor(p.score) }}>
+                  {isCutOrOut ? p.score : p.score}
+                </span>
+                <span style={{ minWidth: 52, display: 'flex', justifyContent: 'flex-end' }}>
+                  <ThruBadge p={p} lang={lang} />
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
@@ -240,7 +294,7 @@ function GolfCard({ match, onClick, onViewStandings }: { match: Match; onClick: 
               <span style={{ fontSize: '0.68rem', color: 'var(--muted)', minWidth: 30, fontWeight: i === 0 ? 700 : 400 }}>{p.pos}</span>
               <span style={{ fontSize: '0.83rem', fontWeight: i === 0 ? 700 : 400, flex: 1, color: i === 0 ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
               <span style={{ fontSize: '0.83rem', fontWeight: 700, color: parseGolfScoreColor(p.score), minWidth: 34, textAlign: 'right' }}>{p.score}</span>
-              <span style={{ fontSize: '0.68rem', color: 'var(--muted)', minWidth: 28, textAlign: 'right' }}>{p.thru}</span>
+              <span style={{ minWidth: 28, display: 'flex', justifyContent: 'flex-end' }}><ThruBadge p={p} lang={lang} /></span>
             </div>
           ))}
           {match.leaderboard.length > 5 && (
