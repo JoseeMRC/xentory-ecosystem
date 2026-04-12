@@ -277,69 +277,84 @@ export async function fetchLiveMatchById(
 
 // ── FETCH ALL LIVE MATCHES ACROSS SPORTS for Bet ticker ──────────────────────
 export async function fetchAllLiveMatches(): Promise<Match[]> {
-  const results: Match[] = [];
-  // Football top leagues
-  const topLeagues = FOOTBALL_LEAGUES.slice(0, 6);
-  const footPromises = topLeagues.map(async cfg => {
-    const json = await espnFetchLive(`/${cfg.slug}/scoreboard`);
-    const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
-    return parseEspnFootballEvents(events, cfg);
-  });
-  const footResults = await Promise.all(footPromises);
-  results.push(...footResults.flat());
 
-  // Tennis live
-  for (const tour of TENNIS_LEAGUES) {
-    const json = await espnFetchLive(`/${tour.slug}/scoreboard`);
-    const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
-    for (const ev of events.slice(0, 6)) {
-      const comp = ev.competitions?.[0];
-      const p1   = comp?.competitors?.[0];
-      const p2   = comp?.competitors?.[1];
-      if (!p1 || !p2) continue;
-      results.push({
-        id: parseInt(ev.id ?? '0') + tour.baseId,
-        espnEventId: ev.id,
-        sport: 'tennis',
-        competition: { id: tour.baseId, name: ev.name ?? tour.name, sport: 'tennis', country: tour.country, logo: '', emoji: tour.emoji },
-        homeTeam: { id: parseInt(p1.id ?? '0'), name: p1.athlete?.displayName ?? 'P1', shortName: p1.athlete?.shortName ?? 'P1' },
-        awayTeam: { id: parseInt(p2.id ?? '0'), name: p2.athlete?.displayName ?? 'P2', shortName: p2.athlete?.shortName ?? 'P2' },
-        date: ev.date ?? new Date().toISOString(),
-        status: 'live',
-        homeScore: parseInt(p1.score ?? '0'),
-        awayScore: parseInt(p2.score ?? '0'),
-        clockDisplay: `Set ${(p1.linescores?.length ?? 0) + 1}`,
-      });
-    }
-  }
-
-  // Basketball live
-  const baskLeagues = [
-    { slug: 'basketball/nba', name: 'NBA', emoji: '🏀', country: 'USA', id: 12, baseId: 20000 },
+  // ── Basketball leagues to poll ─────────────────────────────────────────────
+  const LIVE_BASKETBALL = [
+    { slug: 'basketball/nba',                 name: 'NBA',        emoji: '🏀', country: 'USA',    id: 12,  baseId: 20000 },
+    { slug: 'basketball/wnba',                name: 'WNBA',       emoji: '🏀', country: 'USA',    id: 59,  baseId: 22000 },
+    { slug: 'basketball/nba-development',     name: 'G-League',   emoji: '🏀', country: 'USA',    id: 46,  baseId: 23000 },
+    { slug: 'basketball/mens-college-basketball', name: 'NCAAB',  emoji: '🏀', country: 'USA',    id: 41,  baseId: 24000 },
+    { slug: 'basketball/euroleague',          name: 'EuroLeague', emoji: '🏀', country: 'Europa', id: 17,  baseId: 25000 },
   ];
-  for (const league of baskLeagues) {
-    const json = await espnFetchLive(`/${league.slug}/scoreboard`);
-    const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
-    for (const ev of events.slice(0, 6)) {
-      const comp = ev.competitions?.[0];
-      const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
-      const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
-      if (!home || !away) continue;
-      const clk = parseClock(ev);
-      results.push({
-        id: parseInt(ev.id ?? '0') + league.baseId,
-        espnEventId: ev.id,
-        sport: 'basketball',
-        competition: { id: league.id, name: league.name, sport: 'basketball', country: league.country, logo: '', emoji: league.emoji },
-        homeTeam: { id: parseInt(home.team?.id ?? '0'), name: home.team?.displayName ?? 'Home', shortName: home.team?.abbreviation ?? 'HOM' },
-        awayTeam: { id: parseInt(away.team?.id ?? '0'), name: away.team?.displayName ?? 'Away', shortName: away.team?.abbreviation ?? 'AWY' },
-        date: ev.date ?? new Date().toISOString(),
-        status: 'live',
-        homeScore: parseInt(home.score ?? '0'),
-        awayScore: parseInt(away.score ?? '0'),
-        ...clk,
-      });
-    }
+
+  // ── All sources fetched in parallel ───────────────────────────────────────
+  const allSettled = await Promise.allSettled([
+    // All football leagues
+    ...FOOTBALL_LEAGUES.map(async cfg => {
+      const json   = await espnFetchLive(`/${cfg.slug}/scoreboard`);
+      const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
+      return parseEspnFootballEvents(events, cfg);
+    }),
+
+    // All basketball leagues
+    ...LIVE_BASKETBALL.map(async league => {
+      const json   = await espnFetchLive(`/${league.slug}/scoreboard`);
+      const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
+      const matches: Match[] = [];
+      for (const ev of events) {
+        const comp = ev.competitions?.[0];
+        const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+        const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+        if (!home || !away) continue;
+        matches.push({
+          id: parseInt(ev.id ?? '0') + league.baseId,
+          espnEventId: ev.id,
+          sport: 'basketball',
+          competition: { id: league.id, name: league.name, sport: 'basketball', country: league.country, logo: '', emoji: league.emoji },
+          homeTeam: { id: parseInt(home.team?.id ?? '0'), name: home.team?.displayName ?? 'Home', shortName: home.team?.abbreviation ?? 'HOM' },
+          awayTeam: { id: parseInt(away.team?.id ?? '0'), name: away.team?.displayName ?? 'Away', shortName: away.team?.abbreviation ?? 'AWY' },
+          date:      ev.date ?? new Date().toISOString(),
+          status:    'live',
+          homeScore: parseInt(home.score ?? '0'),
+          awayScore: parseInt(away.score ?? '0'),
+          ...parseClock(ev),
+        });
+      }
+      return matches;
+    }),
+
+    // All tennis tours
+    ...TENNIS_LEAGUES.map(async tour => {
+      const json   = await espnFetchLive(`/${tour.slug}/scoreboard`);
+      const events = (json?.events ?? []).filter((e: any) => e.status?.type?.state === 'in');
+      const matches: Match[] = [];
+      for (const ev of events) {
+        const comp = ev.competitions?.[0];
+        const p1   = comp?.competitors?.[0];
+        const p2   = comp?.competitors?.[1];
+        if (!p1 || !p2) continue;
+        matches.push({
+          id: parseInt(ev.id ?? '0') + tour.baseId,
+          espnEventId: ev.id,
+          sport: 'tennis',
+          competition: { id: tour.baseId, name: ev.name ?? tour.name, sport: 'tennis', country: tour.country, logo: '', emoji: tour.emoji },
+          homeTeam: { id: parseInt(p1.id ?? '0'), name: p1.athlete?.displayName ?? 'P1', shortName: p1.athlete?.shortName ?? 'P1' },
+          awayTeam: { id: parseInt(p2.id ?? '0'), name: p2.athlete?.displayName ?? 'P2', shortName: p2.athlete?.shortName ?? 'P2' },
+          date:      ev.date ?? new Date().toISOString(),
+          status:    'live',
+          homeScore: parseInt(p1.score ?? '0'),
+          awayScore: parseInt(p2.score ?? '0'),
+          clockDisplay: `Set ${(p1.linescores?.length ?? 0) + 1}`,
+        });
+      }
+      return matches;
+    }),
+  ]);
+
+  // Collect fulfilled results (failed league fetches are silently skipped)
+  const results: Match[] = [];
+  for (const r of allSettled) {
+    if (r.status === 'fulfilled') results.push(...r.value);
   }
 
   // Deduplicate: same ESPN event may appear in multiple league feeds
