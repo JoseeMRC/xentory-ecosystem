@@ -342,10 +342,15 @@ export async function fetchAllLiveMatches(): Promise<Match[]> {
     }
   }
 
-  return results;
-}
-
-export async function fetchRecentMatches(leagueId: number, limit = 5): Promise<Match[]> {
+  // Deduplicate: same ESPN event may appear in multiple league feeds
+  const seen = new Set<string>();
+  return results.filter(m => {
+    const key = m.espnEventId ?? String(m.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}(leagueId: number, limit = 5): Promise<Match[]> {
   const cfg = FOOTBALL_LEAGUES.find(l => l.id === leagueId);
   if (!cfg) return [];
   // Try yesterday and 2 days ago
@@ -853,6 +858,7 @@ export async function fetchGolfMatches(): Promise<Match[]> {
         score:       p.score ?? 'E',
         thru:        String(p.thru ?? p.status?.type?.detail ?? '-'),
         teeTime:     p.teeTime ?? undefined,
+        playerId:    parseInt(p.athlete?.id ?? p.id ?? '0') || undefined,
         playerStatus: (() => {
           const st = (p.status?.type?.state ?? '').toLowerCase();
           const desc = (p.status?.type?.description ?? '').toLowerCase();
@@ -1524,30 +1530,30 @@ export function getMockMatchesBySport(sport: string): Match[] {
       awayTeam: { id: 502, name: 'Rory McIlroy', shortName: 'MCI' },
       date: d(0, 14), status: 'live', venue: 'TPC San Antonio (Oaks Course)', round: 'Round 3',
       leaderboard: [
-        { pos: '1',   name: 'Scottie Scheffler',   score: '-12', thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T2',  name: 'Rory McIlroy',         score: '-9',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T2',  name: 'Collin Morikawa',      score: '-9',  thru: '15',  playerStatus: 'active'   },
-        { pos: '4',   name: 'Xander Schauffele',    score: '-8',  thru: '12',  playerStatus: 'active'   },
-        { pos: 'T5',  name: 'Jon Rahm',             score: '-7',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T5',  name: 'Wyndham Clark',        score: '-7',  thru: '9',   playerStatus: 'active'   },
-        { pos: '7',   name: 'Viktor Hovland',       score: '-6',  thru: '7',   playerStatus: 'active'   },
-        { pos: 'T8',  name: 'Tony Finau',           score: '-5',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T8',  name: 'Patrick Cantlay',      score: '-5',  thru: '11',  playerStatus: 'active'   },
-        { pos: 'T8',  name: 'Hideki Matsuyama',     score: '-5',  thru: '8',   playerStatus: 'active'   },
-        { pos: 'T11', name: 'Tommy Fleetwood',      score: '-4',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T11', name: 'Shane Lowry',          score: '-4',  thru: '14',  playerStatus: 'active'   },
-        { pos: 'T11', name: 'Russell Henley',       score: '-4',  thru: '6',   playerStatus: 'active'   },
-        { pos: 'T14', name: 'Matt Fitzpatrick',     score: '-3',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T14', name: 'Brian Harman',         score: '-3',  thru: '10',  playerStatus: 'active'   },
-        { pos: 'T16', name: 'Keegan Bradley',       score: '-2',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T16', name: 'Adam Scott',           score: '-2',  thru: '13',  playerStatus: 'active'   },
-        { pos: 'T18', name: 'Sepp Straka',          score: '-1',  thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T18', name: 'Cameron Young',        score: '-1',  thru: '9',   playerStatus: 'active'   },
-        { pos: 'T20', name: 'Justin Thomas',        score: 'E',   thru: 'F',   playerStatus: 'finished' },
-        { pos: 'T20', name: 'Max Homa',             score: 'E',   thru: '5',   playerStatus: 'active'   },
-        { pos: 'CUT', name: 'Tiger Woods',          score: '+4',  thru: 'F',   playerStatus: 'cut'      },
-        { pos: 'CUT', name: 'Phil Mickelson',       score: '+5',  thru: 'F',   playerStatus: 'cut'      },
-        { pos: 'WD',  name: 'Brooks Koepka',        score: '--',  thru: '--',  playerStatus: 'wd'       },
+        { pos: '1',   name: 'Scottie Scheffler',   score: '-12', thru: 'F',   playerStatus: 'finished', playerId: 3470 },
+        { pos: 'T2',  name: 'Rory McIlroy',         score: '-9',  thru: 'F',   playerStatus: 'finished', playerId: 3836 },
+        { pos: 'T2',  name: 'Collin Morikawa',      score: '-9',  thru: '15',  playerStatus: 'active',   playerId: 4362 },
+        { pos: '4',   name: 'Xander Schauffele',    score: '-8',  thru: '12',  playerStatus: 'active',   playerId: 4150 },
+        { pos: 'T5',  name: 'Jon Rahm',             score: '-7',  thru: 'F',   playerStatus: 'finished', playerId: 4321 },
+        { pos: 'T5',  name: 'Wyndham Clark',        score: '-7',  thru: '9',   playerStatus: 'active',   playerId: 4686 },
+        { pos: '7',   name: 'Viktor Hovland',       score: '-6',  thru: '7',   playerStatus: 'active',   playerId: 4563 },
+        { pos: 'T8',  name: 'Tony Finau',           score: '-5',  thru: 'F',   playerStatus: 'finished', playerId: 3218 },
+        { pos: 'T8',  name: 'Patrick Cantlay',      score: '-5',  thru: '11',  playerStatus: 'active',   playerId: 4025 },
+        { pos: 'T8',  name: 'Hideki Matsuyama',     score: '-5',  thru: '8',   playerStatus: 'active',   playerId: 3341 },
+        { pos: 'T11', name: 'Tommy Fleetwood',      score: '-4',  thru: 'F',   playerStatus: 'finished', playerId: 3622 },
+        { pos: 'T11', name: 'Shane Lowry',          score: '-4',  thru: '14',  playerStatus: 'active',   playerId: 3566 },
+        { pos: 'T11', name: 'Russell Henley',       score: '-4',  thru: '6',   playerStatus: 'active',   playerId: 3017 },
+        { pos: 'T14', name: 'Matt Fitzpatrick',     score: '-3',  thru: 'F',   playerStatus: 'finished', playerId: 4177 },
+        { pos: 'T14', name: 'Brian Harman',         score: '-3',  thru: '10',  playerStatus: 'active',   playerId: 3220 },
+        { pos: 'T16', name: 'Keegan Bradley',       score: '-2',  thru: 'F',   playerStatus: 'finished', playerId: 3044 },
+        { pos: 'T16', name: 'Adam Scott',           score: '-2',  thru: '13',  playerStatus: 'active',   playerId: 1639 },
+        { pos: 'T18', name: 'Sepp Straka',          score: '-1',  thru: 'F',   playerStatus: 'finished', playerId: 4513 },
+        { pos: 'T18', name: 'Cameron Young',        score: '-1',  thru: '9',   playerStatus: 'active',   playerId: 4799 },
+        { pos: 'T20', name: 'Justin Thomas',        score: 'E',   thru: 'F',   playerStatus: 'finished', playerId: 3326 },
+        { pos: 'T20', name: 'Max Homa',             score: 'E',   thru: '5',   playerStatus: 'active',   playerId: 4004 },
+        { pos: 'CUT', name: 'Tiger Woods',          score: '+4',  thru: 'F',   playerStatus: 'cut',      playerId: 1410  },
+        { pos: 'CUT', name: 'Phil Mickelson',       score: '+5',  thru: 'F',   playerStatus: 'cut',      playerId: 857   },
+        { pos: 'WD',  name: 'Brooks Koepka',        score: '--',  thru: '--',  playerStatus: 'wd',       playerId: 3669  },
       ],
       totalPlayers: 156,
     },

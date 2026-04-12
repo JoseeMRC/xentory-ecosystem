@@ -122,7 +122,7 @@ function ThruBadge({ p, lang }: { p: NonNullable<Match['leaderboard']>[number]; 
   return <span style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>–</span>;
 }
 
-function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => void }) {
+function GolfStandingsModal({ match, onClose, onPlayerSelect }: { match: Match; onClose: () => void; onPlayerSelect: (playerMatch: Match) => void }) {
   const { lang } = useLang();
   const leaderboard = match.leaderboard ?? [];
   const matchDate   = new Date(match.date);
@@ -209,22 +209,47 @@ function GolfStandingsModal({ match, onClose }: { match: Match; onClose: () => v
             </div>
           ) : leaderboard.map((p, i) => {
             const isCutOrOut = p.playerStatus === 'cut' || p.playerStatus === 'mdf' || p.playerStatus === 'wd' || p.playerStatus === 'dq';
+            const canAnalyze = !isCutOrOut;
+
+            const handlePlayerClick = () => {
+              if (!canAnalyze) return;
+              // Build a player-specific match so AnalysisPage analyses THIS player
+              const shortName = p.name.split(' ').pop()?.slice(0, 4).toUpperCase() ?? p.name.slice(0, 3).toUpperCase();
+              const playerMatch: Match = {
+                ...match,
+                // Unique ID per player so AnalysisPage re-generates analysis
+                id: match.id * 10000 + (p.playerId ?? i + 1),
+                homeTeam: { id: p.playerId ?? i + 1, name: p.name, shortName },
+                awayTeam: { id: 99999, name: lang === 'es' ? 'El Campo' : 'The Field', shortName: 'FLD' },
+              };
+              onPlayerSelect(playerMatch);
+            };
+
             return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center',
-                padding: '0.42rem 0.6rem', borderRadius: 8,
-                background: i === 0 ? 'rgba(201,168,76,0.08)' : i < 3 ? 'rgba(255,255,255,0.025)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
-                marginBottom: '0.06rem',
-                opacity: isCutOrOut ? 0.55 : 1,
-              }}>
+              <div
+                key={i}
+                onClick={handlePlayerClick}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  padding: '0.42rem 0.6rem', borderRadius: 8,
+                  background: i === 0 ? 'rgba(201,168,76,0.08)' : i < 3 ? 'rgba(255,255,255,0.025)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
+                  marginBottom: '0.06rem',
+                  opacity: isCutOrOut ? 0.55 : 1,
+                  cursor: canAnalyze ? 'pointer' : 'default',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (canAnalyze) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = i === 0 ? 'rgba(201,168,76,0.08)' : i < 3 ? 'rgba(255,255,255,0.025)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent'; }}
+              >
                 <span style={{ minWidth: 36, fontSize: '0.72rem', color: i < 3 && !isCutOrOut ? 'var(--gold)' : 'var(--muted)', fontWeight: i < 3 && !isCutOrOut ? 700 : 400 }}>
                   {p.pos}
                 </span>
                 <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: i === 0 ? 700 : 400, color: i === 0 && !isCutOrOut ? 'var(--gold)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.name}
+                  {canAnalyze && <span style={{ fontSize: '0.58rem', color: 'var(--muted)', marginLeft: '0.4rem', opacity: 0.6 }}>→ análisis</span>}
                 </span>
                 <span style={{ minWidth: 48, textAlign: 'right', fontSize: '0.88rem', fontWeight: 700, color: isCutOrOut ? 'var(--muted)' : parseGolfScoreColor(p.score) }}>
-                  {isCutOrOut ? p.score : p.score}
+                  {p.score}
                 </span>
                 <span style={{ minWidth: 52, display: 'flex', justifyContent: 'flex-end' }}>
                   <ThruBadge p={p} lang={lang} />
@@ -273,6 +298,11 @@ function GolfCard({ match, onClick, onViewStandings }: { match: Match; onClick: 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem', flexShrink: 0, marginLeft: '0.8rem' }}>
           {match.status === 'live'     && <span style={liveStyle}>🔴 {lang === 'es' ? 'EN VIVO' : 'LIVE'}</span>}
           {match.status === 'finished' && <span style={finStyle}>{lang === 'es' ? 'FIN' : 'Final'}</span>}
+          {match.status === 'scheduled' && (
+            <span style={{ fontSize: '0.68rem', color: 'var(--gold)', fontWeight: 600, background: 'rgba(201,168,76,0.1)', padding: '0.12rem 0.45rem', borderRadius: 6, border: '1px solid rgba(201,168,76,0.2)' }}>
+              ⏱ {matchDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })}
+            </span>
+          )}
           {match.round && <span style={{ fontSize: '0.72rem', color: 'var(--muted)', textAlign: 'right' }}>{match.round}</span>}
           {!match.round && <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{dateStr}</span>}
         </div>
@@ -304,10 +334,14 @@ function GolfCard({ match, onClick, onViewStandings }: { match: Match; onClick: 
           )}
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '0.8rem 0', color: 'var(--muted)', fontSize: '0.82rem' }}>
-          {match.status === 'scheduled'
-            ? `⏳ ${lang === 'es' ? 'Torneo por comenzar' : 'Tournament upcoming'}`
-            : lang === 'es' ? 'Sin datos de clasificación' : 'No leaderboard data'}
+        <div style={{ textAlign: 'center', padding: '0.8rem 0', fontSize: '0.82rem' }}>
+          {match.status === 'scheduled' ? (
+            <span style={{ color: 'var(--gold)' }}>
+              ⏱ {lang === 'es' ? 'Empieza a las' : 'Starts at'} {matchDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })}
+            </span>
+          ) : (
+            <span style={{ color: 'var(--muted)' }}>{lang === 'es' ? 'Sin datos de clasificación' : 'No leaderboard data'}</span>
+          )}
         </div>
       )}
 
@@ -993,7 +1027,14 @@ export function MatchesPage() {
 
       {/* Golf standings modal */}
       {standingsMatch && (
-        <GolfStandingsModal match={standingsMatch} onClose={() => setStandingsMatch(null)} />
+        <GolfStandingsModal
+          match={standingsMatch}
+          onClose={() => setStandingsMatch(null)}
+          onPlayerSelect={(playerMatch) => {
+            setStandingsMatch(null);
+            navigate(`/matches/${playerMatch.id}`, { state: { match: playerMatch } });
+          }}
+        />
       )}
     </div>
   );
