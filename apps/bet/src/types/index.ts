@@ -59,6 +59,8 @@ export interface Match {
     teeTime?: string;
     /** 'active' | 'cut' | 'wd' | 'mdf' | 'dq' */
     playerStatus?: string;
+    /** ESPN athlete ID — used to navigate to player-specific analysis */
+    playerId?: number;
   }>;
   totalPlayers?: number;
 }
