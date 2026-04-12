@@ -304,8 +304,10 @@ function resolveBestBetOdds(
   const txt = (bestBet.market + ' ' + bestBet.pick).toLowerCase();
 
   if (/over|under|gol|goal|2\.5|3\.5|punt|point|set/i.test(txt)) {
-    const rec = markets.overUnder25.recommendation;
-    const mkt = rec === 'over' ? bkOdds.over25 : bkOdds.under25;
+    // Detect direction from the pick (not market name) to avoid "Over/Under" false match
+    const pickTxt = bestBet.pick.toLowerCase();
+    const isUnder = pickTxt.startsWith('under') || pickTxt.startsWith('menos');
+    const mkt     = isUnder ? bkOdds.under25 : bkOdds.over25;
     return { odds: mkt.best, isRealtime: mkt.isRealtime };
   }
   if (/btts|ambos|both|marcan|score/i.test(txt)) {
@@ -322,6 +324,95 @@ function resolveBestBetOdds(
             : rec === 'away' ? bkOdds.result.away
             : bkOdds.result.draw;
   return { odds: mkt.best, isRealtime: mkt.isRealtime };
+}
+
+/**
+ * Overwrites analysis.markets.bestBet using real bookmaker odds.
+ *
+ * Algorithm:
+ *  1. Build one candidate per available market with:
+ *     - modelProb  = AI model's estimated probability (0-100)
+ *     - marketProb = implied probability from real best odds (1/odds * 100)
+ *     - edge       = modelProb - marketProb  (positive = value)
+ *  2. Prefer candidates with real (isRealtime) odds and positive edge.
+ *  3. Confidence = 50 + edge * 2.5, capped [51, 94].
+ *     If no real odds exist, fall back to highest-model-prob candidate.
+ */
+function refineBestBetFromRealOdds(
+  analysis: MatchAnalysis,
+  bkOdds:   MatchBookmakerOdds,
+): MatchAnalysis['markets']['bestBet'] {
+  const { markets, match } = analysis;
+  const isSoccer     = match.sport === 'football';
+  const isBasketball = match.sport === 'basketball';
+
+  const impPct = (odds: number) => parseFloat(((1 / odds) * 100).toFixed(1));
+
+  type Cand = {
+    market: string; pick: string;
+    odds: number; modelProb: number; marketProb: number;
+    edge: number; isRealtime: boolean;
+  };
+  const cands: Cand[] = [];
+
+  // ── 1X2 / Winner ──────────────────────────────────────────────────────────
+  const r1x2 = markets.result.recommendation;
+  const r1x2Mkt   = r1x2 === 'home' ? bkOdds.result.home : r1x2 === 'away' ? bkOdds.result.away : bkOdds.result.draw;
+  const r1x2Model  = r1x2 === 'home' ? markets.result.home : r1x2 === 'away' ? markets.result.away : markets.result.draw;
+  const r1x2Pick   = r1x2 === 'home' ? `${match.homeTeam.name} gana` : r1x2 === 'away' ? `${match.awayTeam.name} gana` : 'Empate';
+  const r1x2MktP   = impPct(r1x2Mkt.best);
+  cands.push({ market: isSoccer ? 'Resultado 1X2' : 'Ganador del partido', pick: r1x2Pick, odds: r1x2Mkt.best, modelProb: r1x2Model, marketProb: r1x2MktP, edge: r1x2Model - r1x2MktP, isRealtime: r1x2Mkt.isRealtime });
+
+  if (isSoccer) {
+    // ── Over/Under 2.5 ──
+    const ouRec      = markets.overUnder25.recommendation;
+    const ouMkt      = ouRec === 'over' ? bkOdds.over25 : bkOdds.under25;
+    const ouModel    = ouRec === 'over' ? markets.overUnder25.over : markets.overUnder25.under;
+    const ouMktP     = impPct(ouMkt.best);
+    cands.push({ market: ouRec === 'over' ? 'Más de 2.5 goles' : 'Menos de 2.5 goles', pick: `${ouRec === 'over' ? 'Over' : 'Under'} 2.5`, odds: ouMkt.best, modelProb: ouModel, marketProb: ouMktP, edge: ouModel - ouMktP, isRealtime: ouMkt.isRealtime });
+
+    // ── BTTS ──
+    const bttsRec    = markets.btts.recommendation;
+    const bttsMkt    = bttsRec === 'yes' ? bkOdds.bttsYes : bkOdds.bttsNo;
+    const bttsModel  = bttsRec === 'yes' ? markets.btts.yes : markets.btts.no;
+    const bttsMktP   = impPct(bttsMkt.best);
+    cands.push({ market: 'Ambos equipos marcan', pick: `BTTS ${bttsRec === 'yes' ? 'Sí' : 'No'}`, odds: bttsMkt.best, modelProb: bttsModel, marketProb: bttsMktP, edge: bttsModel - bttsMktP, isRealtime: bttsMkt.isRealtime });
+  } else if (isBasketball) {
+    // ── Over/Under (pts) ──
+    const ouRec      = markets.overUnder25.recommendation;
+    const ouMkt      = ouRec === 'over' ? bkOdds.over25 : bkOdds.under25;
+    const ouModel    = ouRec === 'over' ? markets.overUnder25.over : markets.overUnder25.under;
+    const ouMktP     = impPct(ouMkt.best);
+    cands.push({ market: `Puntos Over/Under ${markets.overUnder25.line}`, pick: `${ouRec === 'over' ? 'Over' : 'Under'} ${markets.overUnder25.line}`, odds: ouMkt.best, modelProb: ouModel, marketProb: ouMktP, edge: ouModel - ouMktP, isRealtime: ouMkt.isRealtime });
+
+    // ── Handicap ──
+    const hcRec      = markets.handicap.recommendation;
+    const hcName     = hcRec === 'home' ? match.homeTeam.name : match.awayTeam.name;
+    const hcModel    = hcRec === 'home' ? markets.handicap.home : markets.handicap.away;
+    const hcMktP     = impPct(bkOdds.handicap.best);
+    cands.push({ market: 'Hándicap', pick: `${hcName} (${markets.handicap.line > 0 ? '+' : ''}${markets.handicap.line})`, odds: bkOdds.handicap.best, modelProb: hcModel, marketProb: hcMktP, edge: hcModel - hcMktP, isRealtime: bkOdds.handicap.isRealtime });
+  }
+
+  // Select: prefer real-odds candidates with positive edge; fallback to highest model prob
+  const valueReal = cands.filter(c => c.isRealtime && c.edge > 0);
+  const best = valueReal.length > 0
+    ? valueReal.reduce((a, b) => b.edge > a.edge ? b : a)
+    : cands.reduce((a, b) => b.modelProb > a.modelProb ? b : a);
+
+  const edge       = parseFloat(best.edge.toFixed(1));
+  const confidence = Math.round(Math.min(94, Math.max(51, 50 + best.edge * 2.5)));
+
+  const reasoning = best.isRealtime
+    ? `Modelo: ${best.modelProb}% · Mercado implica: ${best.marketProb}% · Edge: ${edge >= 0 ? '+' : ''}${edge}% · Mejor cuota real: @${best.odds.toFixed(2)}. ${edge > 8 ? 'El mercado subestima claramente esta opción — hay valor estadístico.' : edge > 3 ? 'Ventaja moderada detectada respecto al mercado.' : 'Ligera ventaja según el modelo.'}`
+    : `Modelo: ${best.modelProb}% de probabilidad — cuotas estimadas (sin datos de mercado en tiempo real). Confianza estadística del modelo: ${confidence}%.`;
+
+  return {
+    market:     best.market,
+    pick:       best.pick,
+    odds:       parseFloat(best.odds.toFixed(2)),
+    confidence,
+    reasoning,
+  };
 }
 
 function LiveScoreboard({ match, liveData }: { match: Match; liveData: Partial<Match>|null }) {
@@ -462,14 +553,9 @@ export function MatchAnalysisPage() {
       homeStats = { ...homeStats, team: { ...homeStats.team, name: match.homeTeam.name, shortName: match.homeTeam.shortName ?? match.homeTeam.name.slice(0, 3).toUpperCase() } };
       awayStats = { ...awayStats, team: { ...awayStats.team, name: match.awayTeam.name, shortName: match.awayTeam.shortName ?? match.awayTeam.name.slice(0, 3).toUpperCase() } };
       const result = await generateMatchAnalysis(match, homeStats, awayStats, user?.plan ?? 'free');
-      setAnalysis(result);
-      logActivity({
-        type: 'analysis',
-        sport: SPORT_CONFIG[match.sport]?.emoji ?? '🎾',
-        title: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
-        subtitle: match.competition.name,
-      });
-      // Fetch bookmaker odds (real or derived)
+
+      // Fetch real bookmaker odds in parallel with analysis generation,
+      // then refine the best bet using actual market prices.
       const odds = await fetchBookmakerOdds(
         match.homeTeam.name,
         match.awayTeam.name,
@@ -485,7 +571,18 @@ export function MatchAnalysisPage() {
         },
         String(match.id),
       );
+
+      // Overwrite AI-derived best bet with one backed by real market odds
+      result.markets.bestBet = refineBestBetFromRealOdds(result, odds);
+
+      setAnalysis(result);
       setBkOdds(odds);
+      logActivity({
+        type: 'analysis',
+        sport: SPORT_CONFIG[match.sport]?.emoji ?? '🎾',
+        title: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
+        subtitle: match.competition.name,
+      });
     } catch { setError(t('Error al generar el análisis. Inténtalo de nuevo.', 'Error generating analysis. Please try again.')); }
     setLoading(false);
   };
