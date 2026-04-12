@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { QuickBar } from './QuickBar';
 import { useLang } from '../../context/LanguageContext';
+import { SPORT_CONFIG } from '../../constants';
 
 const IconDashboard = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -62,10 +63,8 @@ const IconSignOut = () => (
 
 const HUB_URL = (import.meta as any).env?.VITE_HUB_URL ?? 'https://x-eight-beryl.vercel.app';
 const PLAN_COLORS: Record<string, string> = { free: '#6b7294', pro: '#c9a84c', elite: '#00d4ff' };
-const SPORTS = [
-  { key: 'football', label: 'Football' }, { key: 'tennis', label: 'Tennis' },
-  { key: 'basketball', label: 'Basketball' }, { key: 'f1', label: 'Formula 1' }, { key: 'golf', label: 'Golf' },
-];
+const SPORTS = (Object.entries(SPORT_CONFIG) as [string, { label: string; emoji: string; color: string }][])
+  .map(([key, cfg]) => ({ key, label: cfg.label }));
 
 function NavContent({ onNav, hideSports }: { onNav?: () => void; hideSports?: boolean }) {
   const { user, logout } = useAuth();
