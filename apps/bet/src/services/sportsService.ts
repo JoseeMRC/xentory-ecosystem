@@ -350,7 +350,9 @@ export async function fetchAllLiveMatches(): Promise<Match[]> {
     seen.add(key);
     return true;
   });
-}(leagueId: number, limit = 5): Promise<Match[]> {
+}
+
+export async function fetchRecentMatches(leagueId: number, limit = 5): Promise<Match[]> {
   const cfg = FOOTBALL_LEAGUES.find(l => l.id === leagueId);
   if (!cfg) return [];
   // Try yesterday and 2 days ago
