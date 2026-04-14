@@ -441,44 +441,34 @@ async function fetchTennisMatchesFromESPN(): Promise<Match[]> {
 
   for (const tour of TENNIS_LEAGUES) {
     const seenIds = new Set<string>();
-    let events: any[] = [];
+    const allEvents: any[] = [];
 
-    // Helper: merge events from two JSON responses, deduplicating by id
-    const merge = (j1: any, j2: any) => {
-      const evs: any[] = [...(j1?.events ?? []), ...(j2?.events ?? [])];
-      const out: any[] = [];
-      for (const ev of evs) {
+    const addEvents = (json: any) => {
+      for (const ev of (json?.events ?? [])) {
         if (seenIds.has(ev.id)) continue;
         seenIds.add(ev.id);
-        out.push(ev);
+        allEvents.push(ev);
       }
-      return out;
     };
 
-    // 1. Base scoreboard (both slugs in parallel) — covers the current ESPN week
-    const [j1, j2] = await Promise.all([
+    // Fire ALL requests in parallel:
+    //  • base scoreboard (both slugs) — ESPN returns current week's data here
+    //  • individual day requests for past 5 days + next 10 days × both slugs
+    // ESPN tennis may not support date RANGES, so we use single-day params.
+    const days = Array.from({ length: 16 }, (_, i) => i - 5); // -5 … +10
+    const fetches: Promise<any>[] = [
       espnFetch(`/${tour.slug}/scoreboard`),
       espnFetch(`/${tour.altSlug}/scoreboard`),
-    ]);
-    events = merge(j1, j2);
+      ...days.flatMap(d => [
+        espnFetch(`/${tour.slug}/scoreboard?dates=${espnDate(d)}`),
+        espnFetch(`/${tour.altSlug}/scoreboard?dates=${espnDate(d)}`),
+      ]),
+    ];
 
-    // 2. If still empty, try a ±7-day window in one shot, then ±14-day
-    if (events.length === 0) {
-      const ranges = [
-        `${espnDate(-3)}-${espnDate(7)}`,   // current tournament week
-        `${espnDate(-7)}-${espnDate(14)}`,  // wider window
-      ];
-      for (const range of ranges) {
-        if (events.length > 0) break;
-        const [r1, r2] = await Promise.all([
-          espnFetch(`/${tour.slug}/scoreboard?dates=${range}`),
-          espnFetch(`/${tour.altSlug}/scoreboard?dates=${range}`),
-        ]);
-        events = merge(r1, r2);
-      }
-    }
+    const responses = await Promise.all(fetches);
+    for (const json of responses) addEvents(json);
 
-    for (const ev of events) {
+    for (const ev of allEvents) {
       // ESPN tennis has two shapes:
       // A) each event IS a match  → competitions[0] has 2 competitors
       // B) each event IS a tournament → competitions[] is the list of matches
@@ -492,7 +482,7 @@ async function fetchTennisMatchesFromESPN(): Promise<Match[]> {
           if (m) results.push(m);
         }
       } else {
-        // Shape A: single match
+        // Shape A: single match (or tournament listed as one event)
         const m = parseTennisMatch(ev, competitions[0], tour);
         if (m) results.push(m);
       }
@@ -746,23 +736,31 @@ async function fetchTennisFromApiSports(): Promise<Match[]> {
 }
 
 export async function fetchTennisMatches(): Promise<Match[]> {
-  // 1. ESPN — public API, no CORS issues, no key required
-  const espn = await fetchTennisMatchesFromESPN();
-  if (espn.length > 0) return espn;
+  // Run ESPN and TheSportsDB in parallel — both are public/CORS-free
+  const [espn, sdb] = await Promise.all([
+    fetchTennisMatchesFromESPN(),
+    fetchTennisFromSportsDB(),
+  ]);
 
-  // 2. TheSportsDB — free public API
-  const sdb = await fetchTennisFromSportsDB();
-  if (sdb.length > 0) return sdb;
+  // Merge & deduplicate by espnEventId / id
+  const seen = new Set<string>();
+  const merged: Match[] = [];
+  for (const m of [...espn, ...sdb]) {
+    const key = m.espnEventId ?? String(m.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(m);
+  }
+  if (merged.length > 0) return merged;
 
-  // 3. Sofascore — unofficial API (may be CORS-blocked in browser environments)
+  // Fallback: Sofascore (may be CORS-blocked), then api-sports.io proxy
   const sofascore = await fetchTennisFromSofascore();
   if (sofascore.length > 0) return sofascore;
 
-  // 4. api-sports.io via Supabase proxy
   const apiSports = await fetchTennisFromApiSports();
   if (apiSports.length > 0) return apiSports;
 
-  // 5. Last resort: mocks
+  // Last resort: mocks
   return getMockMatchesBySport('tennis');
 }
 
