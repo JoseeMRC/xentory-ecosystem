@@ -440,65 +440,64 @@ async function fetchTennisMatchesFromESPN(): Promise<Match[]> {
   const results: Match[] = [];
 
   for (const tour of TENNIS_LEAGUES) {
+    const seenIds = new Set<string>();
     let events: any[] = [];
 
-    // 1. Base scoreboard — try main slug, then alt slug
-    const baseJson = await espnFetch(`/${tour.slug}/scoreboard`);
-    events = baseJson?.events ?? [];
-
-    if (events.length === 0) {
-      const altJson = await espnFetch(`/${tour.altSlug}/scoreboard`);
-      events = altJson?.events ?? [];
-    }
-
-    // 2. Day-by-day forward scan (today → +7 days) — try both slugs
-    if (events.length === 0) {
-      for (let d = 0; d <= 7 && events.length === 0; d++) {
-        const json = await espnFetch(`/${tour.slug}/scoreboard?dates=${espnDate(d)}`);
-        events = json?.events ?? [];
-        if (events.length === 0) {
-          const altJson = await espnFetch(`/${tour.altSlug}/scoreboard?dates=${espnDate(d)}`);
-          events = altJson?.events ?? [];
-        }
+    // Helper: merge events from two JSON responses, deduplicating by id
+    const merge = (j1: any, j2: any) => {
+      const evs: any[] = [...(j1?.events ?? []), ...(j2?.events ?? [])];
+      const out: any[] = [];
+      for (const ev of evs) {
+        if (seenIds.has(ev.id)) continue;
+        seenIds.add(ev.id);
+        out.push(ev);
       }
-    }
+      return out;
+    };
 
-    // 3. Backward scan in case we're between rounds
+    // 1. Base scoreboard (both slugs in parallel) — covers the current ESPN week
+    const [j1, j2] = await Promise.all([
+      espnFetch(`/${tour.slug}/scoreboard`),
+      espnFetch(`/${tour.altSlug}/scoreboard`),
+    ]);
+    events = merge(j1, j2);
+
+    // 2. If still empty, try a ±7-day window in one shot, then ±14-day
     if (events.length === 0) {
-      for (let d = 1; d <= 5 && events.length === 0; d++) {
-        const json = await espnFetch(`/${tour.slug}/scoreboard?dates=${espnDate(-d)}`);
-        events = json?.events ?? [];
-        if (events.length === 0) {
-          const altJson = await espnFetch(`/${tour.altSlug}/scoreboard?dates=${espnDate(-d)}`);
-          events = altJson?.events ?? [];
-        }
+      const ranges = [
+        `${espnDate(-3)}-${espnDate(7)}`,   // current tournament week
+        `${espnDate(-7)}-${espnDate(14)}`,  // wider window
+      ];
+      for (const range of ranges) {
+        if (events.length > 0) break;
+        const [r1, r2] = await Promise.all([
+          espnFetch(`/${tour.slug}/scoreboard?dates=${range}`),
+          espnFetch(`/${tour.altSlug}/scoreboard?dates=${range}`),
+        ]);
+        events = merge(r1, r2);
       }
     }
 
     for (const ev of events) {
-      // ESPN tennis can have two shapes:
-      // A) each event IS a match → competitions[0] has 2 competitors
+      // ESPN tennis has two shapes:
+      // A) each event IS a match  → competitions[0] has 2 competitors
       // B) each event IS a tournament → competitions[] is the list of matches
       const competitions: any[] = ev.competitions ?? [];
       if (competitions.length === 0) continue;
 
-      const firstComp = competitions[0];
-      const isNestedTournament = competitions.length > 1 ||
-        (firstComp?.competitors?.length ?? 0) === 2;
-
-      if (isNestedTournament && competitions.length > 1) {
-        // Shape B: tournament — iterate all matches
-        for (const comp of competitions.slice(0, 15)) {
+      if (competitions.length > 1) {
+        // Shape B: tournament with multiple matches
+        for (const comp of competitions.slice(0, 30)) {
           const m = parseTennisMatch(ev, comp, tour);
           if (m) results.push(m);
         }
       } else {
-        // Shape A: event is the match
-        const m = parseTennisMatch(ev, firstComp, tour);
+        // Shape A: single match
+        const m = parseTennisMatch(ev, competitions[0], tour);
         if (m) results.push(m);
       }
 
-      if (results.length >= 20) break;
+      if (results.length >= 50) break;
     }
   }
 
@@ -747,21 +746,21 @@ async function fetchTennisFromApiSports(): Promise<Match[]> {
 }
 
 export async function fetchTennisMatches(): Promise<Match[]> {
-  // 1. Sofascore — comprehensive unofficial API, no key needed
-  const sofascore = await fetchTennisFromSofascore();
-  if (sofascore.length > 0) return sofascore;
+  // 1. ESPN — public API, no CORS issues, no key required
+  const espn = await fetchTennisMatchesFromESPN();
+  if (espn.length > 0) return espn;
 
-  // 2. api-sports.io via Supabase proxy
-  const apiSports = await fetchTennisFromApiSports();
-  if (apiSports.length > 0) return apiSports;
-
-  // 3. TheSportsDB — free public API
+  // 2. TheSportsDB — free public API
   const sdb = await fetchTennisFromSportsDB();
   if (sdb.length > 0) return sdb;
 
-  // 4. ESPN fallback
-  const espn = await fetchTennisMatchesFromESPN();
-  if (espn.length > 0) return espn;
+  // 3. Sofascore — unofficial API (may be CORS-blocked in browser environments)
+  const sofascore = await fetchTennisFromSofascore();
+  if (sofascore.length > 0) return sofascore;
+
+  // 4. api-sports.io via Supabase proxy
+  const apiSports = await fetchTennisFromApiSports();
+  if (apiSports.length > 0) return apiSports;
 
   // 5. Last resort: mocks
   return getMockMatchesBySport('tennis');
