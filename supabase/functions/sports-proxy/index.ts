@@ -1,8 +1,10 @@
 /**
  * Supabase Edge Function: sports-proxy
  * Proxies requests to api-sports.io to avoid CORS from the browser.
- * 
+ * Also proxies Sofascore tennis data (which blocks direct browser requests).
+ *
  * Usage: /functions/v1/sports-proxy?sport=football&path=/fixtures?date=2026-03-11
+ *        /functions/v1/sports-proxy?sport=sofascore-tennis&path=/2026-04-14
  * Deploy: supabase functions deploy sports-proxy
  */
 
@@ -34,6 +36,35 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // ── Sofascore tennis route (no API key needed, server-side fetch bypasses CORS) ──
+  if (sport === 'sofascore-tennis') {
+    const dateStr  = path.replace(/^\//, '');          // "2026-04-14"
+    const upstream = `https://api.sofascore.com/api/v1/sport/tennis/scheduled-events/${dateStr}`;
+    try {
+      const res = await fetch(upstream, {
+        headers: {
+          'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept':          'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer':         'https://www.sofascore.com/',
+          'Origin':          'https://www.sofascore.com',
+        },
+      });
+      if (!res.ok) throw new Error(`Sofascore ${res.status}`);
+      const data = await res.json();
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' },
+      });
+    } catch (err: any) {
+      console.error('[sports-proxy] sofascore error:', err?.message);
+      return new Response(JSON.stringify({ error: 'Sofascore failed', detail: err?.message }), {
+        status: 502, headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  // ── api-sports.io route ──────────────────────────────────────────────────────
   const base = ALLOWED_HOSTS[sport];
   if (!base) {
     return new Response(JSON.stringify({ error: `Unknown sport: ${sport}` }), {
@@ -71,3 +102,4 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+

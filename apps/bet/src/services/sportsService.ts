@@ -514,12 +514,11 @@ async function fetchTennisFromSofascore(): Promise<Match[]> {
 
     if (!json) {
       try {
-        const res = await fetch(
-          `https://api.sofascore.com/api/v1/sport/tennis/scheduled-events/${dateStr}`,
-          { headers: { 'Cache-Control': 'no-cache' } }
-        );
+        // Route through Supabase proxy — Sofascore blocks direct browser requests (CORS)
+        const res = await fetch(`${PROXY}?sport=sofascore-tennis&path=/${dateStr}`);
         if (!res.ok) continue;
         json = await res.json();
+        if (json?.error) continue;          // proxy error response
         sofascoreCache.set(cacheKey, { data: json, ts: Date.now() });
       } catch { continue; }
     }
@@ -736,13 +735,15 @@ async function fetchTennisFromApiSports(): Promise<Match[]> {
 }
 
 export async function fetchTennisMatches(): Promise<Match[]> {
-  // Run ESPN and TheSportsDB in parallel — both are public/CORS-free
+  // 1. Sofascore via Supabase proxy (most complete data; proxy bypasses CORS)
+  const sofascore = await fetchTennisFromSofascore();
+  if (sofascore.length > 0) return sofascore;
+
+  // 2. ESPN + TheSportsDB in parallel (both CORS-free public APIs)
   const [espn, sdb] = await Promise.all([
     fetchTennisMatchesFromESPN(),
     fetchTennisFromSportsDB(),
   ]);
-
-  // Merge & deduplicate by espnEventId / id
   const seen = new Set<string>();
   const merged: Match[] = [];
   for (const m of [...espn, ...sdb]) {
@@ -753,14 +754,11 @@ export async function fetchTennisMatches(): Promise<Match[]> {
   }
   if (merged.length > 0) return merged;
 
-  // Fallback: Sofascore (may be CORS-blocked), then api-sports.io proxy
-  const sofascore = await fetchTennisFromSofascore();
-  if (sofascore.length > 0) return sofascore;
-
+  // 3. api-sports.io via Supabase proxy
   const apiSports = await fetchTennisFromApiSports();
   if (apiSports.length > 0) return apiSports;
 
-  // Last resort: mocks
+  // 4. Last resort: mocks
   return getMockMatchesBySport('tennis');
 }
 
