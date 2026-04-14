@@ -513,6 +513,7 @@ export function MatchesPage() {
 
   // Fetch when sport changes
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setAllMatches([]);
     setQuery('');
@@ -536,10 +537,13 @@ export function MatchesPage() {
       } else {
         results = getMockMatchesBySport(activeSport);
       }
-      setAllMatches(results);
-      setLoading(false);
+      if (!cancelled) {
+        setAllMatches(results);
+        setLoading(false);
+      }
     };
     load();
+    return () => { cancelled = true; };
   }, [activeSport]);
 
   // Focus search on open
